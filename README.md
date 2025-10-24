@@ -32,3 +32,4 @@ Machine Learning Models: Random Forest, Gradient Boosting
 - Lama Almoutiry
 - Yahya Alhabboub
 - Rawan Alsaffar
+- Khalid Alzahrani
