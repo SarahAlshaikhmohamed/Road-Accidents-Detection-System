@@ -1,4 +1,4 @@
-# Road-Accidents-Prediction-System
+# Road-Accidents-Detection-System
 
 ## Objectives
 
