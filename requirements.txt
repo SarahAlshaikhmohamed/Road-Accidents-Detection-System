@@ -18,3 +18,4 @@ python-dotenv
 sqlalchemy
 streamlit-antd-components
 streamlit-lottie
+supabase
