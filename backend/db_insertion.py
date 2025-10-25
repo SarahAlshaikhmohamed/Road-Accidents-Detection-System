@@ -3,6 +3,19 @@
 import json
 from sqlalchemy import text
 
+
+def normalize_vlm_result(vlm_result):
+    if isinstance(vlm_result, str):
+        try:
+            return json.loads(vlm_result)
+        except Exception:
+            return {"error": "VLM returned non-JSON", "raw": vlm_result[:800]}
+    if vlm_result is None:
+        return {}
+    if isinstance(vlm_result, dict):
+        return vlm_result
+    return {"error": "invalid_vlm_result_type", "type": str(type(vlm_result))}
+
 # >> insert accident row into public.incidents
 async def db_insert_accident( engine, knowledge, *,
     event_id: str,
@@ -10,18 +23,20 @@ async def db_insert_accident( engine, knowledge, *,
     time_utc: str,
     public_url: str,
     image_uuid: str,
-    bbox_arr=None,
+    bbox_xyxy=None,
     latitude=None,
     longitude=None,
     vlm_result: dict | None = None,   #
 ):
-        # >> confidences 
-    conf = (vlm_result or {}).get("Confidence", {}) or {}
+    vlm_result = normalize_vlm_result(vlm_result)
+    # >> confidences 
+    conf = vlm_result.get("Confidence", {}) or {}
 
-    def _get_conf(key):
+    def get_conf(key):
         try:
             v = conf.get(key)
-            return float(v) if v is not None else None
+            if v is not None:
+                return float(v) 
         except Exception:
             return None
 
@@ -29,7 +44,7 @@ async def db_insert_accident( engine, knowledge, *,
         "event_id": event_id,
         "camera_id": camera_id,
         "time_utc": time_utc,
-        "bbox_xyxy": bbox_arr,
+        "bbox_xyxy": bbox_xyxy,
         "mean_conf": None, 
         "thumbnail_url": public_url,
         "image_id": image_uuid,
@@ -48,16 +63,16 @@ async def db_insert_accident( engine, knowledge, *,
         "emergency_lights": vlm_result.get("Emergency_lights"),
         "vehicles_count": int(vlm_result.get("Vehicles_count") or 0),
 
-        "conf_category": _get_conf("Category"),
-        "conf_contact_level": _get_conf("Contact_level"),
-        "conf_derivation_object": _get_conf("Derivation_object"),
-        "conf_environment": _get_conf("Environment"),
-        "conf_time": _get_conf("Time"),
-        "conf_traffic_lane": _get_conf("Traffic_lane_of_the_object"),
-        "conf_weather": _get_conf("Weather"),
-        "conf_severity": _get_conf("Severity"),
-        "conf_emergency_lights": _get_conf("Emergency_lights"),
-        "conf_vehicles_count": _get_conf("Vehicles_count"),
+        "conf_category": get_conf("Category"),
+        "conf_contact_level": get_conf("Contact_level"),
+        "conf_derivation_object": get_conf("Derivation_object"),
+        "conf_environment": get_conf("Environment"),
+        "conf_time": get_conf("Time"),
+        "conf_traffic_lane": get_conf("Traffic_lane_of_the_object"),
+        "conf_weather": get_conf("Weather"),
+        "conf_severity": get_conf("Severity"),
+        "conf_emergency_lights": get_conf("Emergency_lights"),
+        "conf_vehicles_count": get_conf("Vehicles_count"),
 
         "raw_report": json.dumps(vlm_result),
     }
@@ -101,10 +116,7 @@ async def db_insert_accident( engine, knowledge, *,
     return inserted_id
 
 # >> insert pothole row into public.potholes + vector insert
-async def db_insert_pothole(
-    engine,
-    knowledge_pothole,        
-    *,
+async def db_insert_pothole(engine, knowledge_pothole,*,
     event_id: str,
     camera_id: str,
     time_utc: str,

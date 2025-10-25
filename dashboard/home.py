@@ -71,7 +71,7 @@ with col1:
     <div class="rads-feature-card card-teal" onclick="window.location.href='live%20stream'">
         <div>
           <div class="rads-feature-title">Live Detection</div>
-          <div class="rads-feature-desc">Real-time camera monitoring & instant alerts.</div>
+          <div class="rads-feature-desc">Description</div>
         </div>
         <div class="rads-feature-cta">Open</div>
     </div>
@@ -83,8 +83,8 @@ with col2:
     st.markdown("""
     <div class="rads-feature-card card-violet" onclick="window.location.href='accidents'">
         <div>
-          <div class="rads-feature-title">Accident Dashboard</div>
-          <div class="rads-feature-desc">Browse, filter, and view VLM incident summaries.</div>
+          <div class="rads-feature-title">Dashboard</div>
+          <div class="rads-feature-desc">Description</div>
         </div>
         <div class="rads-feature-cta">Open</div>
     </div>
@@ -97,7 +97,7 @@ with col3:
     <div class="rads-feature-card card-ruby" onclick="window.location.href='chat'">
         <div>
           <div class="rads-feature-title">Chatbot</div>
-          <div class="rads-feature-desc">Ask about incidents or data insights.</div>
+          <div class="rads-feature-desc"></div>
         </div>
         <div class="rads-feature-cta">Open</div>
     </div>
