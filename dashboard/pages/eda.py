@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from pathlib import Path
+import pathlib
 
 # >> path to CSV 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 DATA_PATH =  ROOT / "datasets" / "analytics" / "Traffic_Accident_Statistics.csv"
 
 # >> page config
