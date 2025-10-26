@@ -1,0 +1,94 @@
+:root{
+  --bg: #1A1A1A;
+  --surface: #232323;
+  --surface-2: #2C2C2C;
+  --text: #F0F0F0;
+  --text-muted: #C9CDD3;
+  --border: #3A3A3A;
+
+  --accent-1: #004D61;   /* dark teal */
+  --accent-2: #822659;   /* deep ruby */
+  --cta: #3E5641;        /* forest green */
+  --violet: #4D0061;     /* deep violet */
+  --rubyred: #C1214F;    /* ruby red */
+
+  --info: #0096A1;
+  --warn: #D67E00;
+  --danger: #C3003E;
+  --success: #00C7A5;
+
+  --radius: 18px;
+  --shadow: 0 8px 28px rgba(0,0,0,.35);
+}
+
+/* Make background apply to the whole Streamlit app */
+html, body { background: var(--bg); color: var(--text); }
+.stApp { background: var(--bg) !important; }
+[data-testid="stAppViewContainer"] { background: var(--bg) !important; }
+section.main, .main, .block-container { background: transparent !important; }
+
+/* Header spacing */
+header[data-testid="stHeader"]{
+  height:12px; padding:0; box-shadow:none; background:transparent;
+}
+
+/* Hero */
+.rads-hero-glass{
+  margin: 12px 0 6px;
+  padding: 24px 26px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.rads-hero-glass h1{
+  margin: 0 0 6px;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: .4px;
+  color: var(--text);
+}
+.rads-hero-glass p{
+  margin:0; color: var(--text-muted);
+}
+
+/* FEATURE CARDS */
+.rads-feature-card{
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 20px 18px;
+  box-shadow: var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  cursor: pointer; user-select: none;
+  height: 190px;
+  display:flex; flex-direction:column; justify-content:space-between;
+}
+.rads-feature-card:hover{
+  transform: translateY(-4px);
+  border-color: var(--accent-1);
+  box-shadow: 0 12px 32px rgba(0,0,0,.45);
+}
+.rads-feature-title{
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: .35rem;
+}
+.rads-feature-desc{
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+.rads-feature-cta{
+  margin-top: .6rem; font-weight: 700; color: #fff;
+  background: rgba(255,255,255,.14);
+  padding: 6px 12px; border-radius: 10px; width: max-content;
+}
+
+/* Color variants for cards */
+.card-teal   { background: linear-gradient(145deg, #004D61, #007A8A); }
+.card-violet { background: linear-gradient(145deg, #4D0061, #7D1B91); }
+.card-ruby   { background: linear-gradient(145deg, #822659, #C1214F); }
+
+/* Utility */
+.center-title { text-align:center; margin: 32px 0 12px; }
