@@ -18,7 +18,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Initialize 
 embeddings = OpenAIEmbedder()
 VLM_agent = Agent(
-    model=OpenAIChat(id="gpt-5", api_key=OPENAI_API_KEY),
+    model=OpenAIChat(id="gpt-4.1", api_key=OPENAI_API_KEY),
     name="VLM agent",
     read_chat_history=True,
     read_tool_call_history=True,

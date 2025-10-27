@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 class PotholeDetector:
-    def _init_(self, model_path: str, imgsz: int):
+    def __init__(self, model_path: str, imgsz: int):
         self.model = YOLO(model_path)
         self.imgsz = imgsz
         self.names = None

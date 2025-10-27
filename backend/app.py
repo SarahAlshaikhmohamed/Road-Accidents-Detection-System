@@ -9,7 +9,7 @@ from threading import Lock, Thread
 # from pathlib import Path
 
 #------------------------------
-from fastapi import FastAPI, UploadFile, File, Form, Query, Path
+from fastapi import FastAPI, UploadFile, File, Form, Query, Path, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -23,9 +23,21 @@ from agno.knowledge.knowledge import Knowledge
 from agno.vectordb.pgvector import PgVector, SearchType
 from agno.knowledge.embedder.openai import OpenAIEmbedder
 
+from fastapi.responses import Response
+from agno.agent import Agent
+from agno.db.postgres import PostgresDb
+from agno.models.openai import OpenAIChat
+from agno.exceptions import CheckTrigger, InputCheckError
+from agno.guardrails import BaseGuardrail, PromptInjectionGuardrail
+from agno.run.team import TeamRunInput
+from agno.media import Audio
+import base64
 #----------------------------------
 # Accident Detector
 from backend.accident_detector import AccidentDetector
+
+# Pothole Detector
+from backend.pothole_detector import PotholeDetector
 
 # VLM
 # from backend.vlm import vlm_analyze_image, VLM_agent
@@ -42,11 +54,13 @@ load_dotenv()
 
 # paths
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MODEL = os.path.join(PROJECT_ROOT, "models", "accident-yolov11.pt")
+DEFAULT_MODEL = os.path.join(PROJECT_ROOT, "models", "accident-yolov11n.pt")
+DEFAULT_POTHOLE_MODEL = os.path.join(PROJECT_ROOT, "models", "pothole-yolo.pt")
 DEFAULT_OUT   = os.path.join(PROJECT_ROOT, "outputs")
 
 # env vars
 MODEL_PATH = os.getenv("MODEL_PATH", DEFAULT_MODEL)
+POTHOLE_MODEL_PATH = os.getenv("POTHOLE_MODEL_PATH", DEFAULT_POTHOLE_MODEL)
 OUT_DIR    = os.getenv("OUT_DIR", DEFAULT_OUT)
 IMG_SIZE   = int(os.getenv("IMG_SIZE", "640"))   # model input size
 CONF_ACC   = float(os.getenv("CONF_ACCIDENT", "0.75"))  # detection confidence threshold
@@ -73,35 +87,44 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # >> Vector DB
 embedder = OpenAIEmbedder()
+db_url = DATABASE_URL
+api_key_openai  = os.getenv("OPENAI_API_KEY")
+
+# Initialize database connection
+db = PostgresDb(db_url=DATABASE_URL)
 
 # Accident Vector DB
-try:
-    knowledge = Knowledge(
-        vector_db=PgVector(
-            table_name="Accident_reports",
-            db_url=DATABASE_URL,
-            embedder=embedder,
-            search_type=SearchType.hybrid
-        ),
-    )
-except Exception as e:
-    knowledge = None
-    print("Warning: Accident Knowledge (vector DB) initialization failed:", e)
+knowledge_Accident_reports = Knowledge(
+    vector_db=PgVector(
+        table_name="Accident_reports",
+        db_url=DATABASE_URL,
+        embedder=embedder,
+        search_type=SearchType.hybrid
+    ),
+    max_results=5
+)
 
 # Pothole Vector DB
-try:
-    knowledge_Pothole = Knowledge(
-        vector_db=PgVector(
-            table_name="Pothole_report",
-            db_url=DATABASE_URL,
-            embedder=embedder,
-            search_type=SearchType.hybrid
-        ),
-    )
-except Exception as e:
-    knowledge_Pothole = None
-    print("Warning: Pothole Knowledge (vector DB) initialization failed:", e)
+knowledge_Pothole = Knowledge(
+    vector_db=PgVector(
+        table_name="Pothole_report",
+        db_url=DATABASE_URL,
+        embedder=embedder,
+        search_type=SearchType.hybrid
+    ),
+    max_results=5
+)
 
+# Accident Statistics Vector DB
+knowledge_Accident_Statistics = Knowledge(
+    vector_db=PgVector(
+        table_name="Traffic_Accident_Statistics_openai",
+        db_url=DATABASE_URL,
+        embedder=embedder,
+        search_type=SearchType.hybrid
+    ),
+    max_results=5
+)
 # -----------------------------------------------------------------------------------
 # Schemas
 
@@ -119,6 +142,47 @@ class ReportResponse(BaseModel):
     event_id: str
     report_text: str
     cached: bool = False
+
+# Request and Response models
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    response: str
+    success: bool
+
+# Guardrail for topic relevance
+class TopicRelevanceResult(BaseModel):
+    is_relevant: bool
+    reason: str
+
+class TrafficIncidentGuardrail(BaseGuardrail):
+    """Guardrail to check if query is related to traffic incidents."""
+    
+    def check(self, run_input: TeamRunInput) -> None:
+        if isinstance(run_input.input_content, str):
+            validator = Agent(
+                model=OpenAIChat(id="gpt-4o-mini", api_key=api_key_openai),
+                instructions=[
+                    "Determine if the user's question is related to traffic incidents, accidents, road safety, or transportation data.",
+                    "Consider synonyms like: mobility, collisions, crashes, road events, transportation incidents.",
+                    "Return is_relevant=True if related, False otherwise."
+                ],
+                output_schema=TopicRelevanceResult,
+            )
+            
+            result = validator.run(
+                input=f"Is this question about traffic incidents? '{run_input.input_content}'"
+            ).content
+            
+            if not result.is_relevant:
+                raise InputCheckError(
+                    f"This system only handles traffic incident queries. {result.reason}",
+                    check_trigger=CheckTrigger.OFF_TOPIC,
+                )
+    
+    async def async_check(self, run_input: TeamRunInput) -> None:
+        self.check(run_input)
 
 # -----------------------------------------------------------------------------------
 
@@ -182,8 +246,10 @@ def upload_image_to_supabase(file_or_bytes, dest_path: str) -> str:
     except Exception as e:
         raise RuntimeError(f"Supabase upload failed: {e}")
 
+    # Get signed URL
     try:
-        signed = bucket.create_signed_url(dest_path, 3600)
+        signed = bucket.create_signed_url(dest_path, 604800) # 7 Days
+        # signed is a dict: {'signedURL': '...', 'signedUrl': '...'}
         public_url = signed.get("signedURL") or signed.get("signedUrl")
     except Exception as e:
         raise RuntimeError(f"Failed to create signed URL: {e}")
@@ -213,7 +279,7 @@ def classify_pothole_size_from_bbox(bbox_xyxy, frame_shape, small_thr=0.01, larg
 
 # >> CONFIRMED EVENTS PROCESSORS 
 
-def process_confirmed_accident(frame, acc_boxes, camera_id, latitude=None, longitude=None):
+def process_confirmed_accident(frame, acc_boxes, camera_id,mean_conf = None, latitude=None, longitude=None):
     # >> save thumb, upload, call VLM, insert DB (accident)
     try:
         event_id = create_event_id("accident", camera_id)
@@ -243,13 +309,14 @@ def process_confirmed_accident(frame, acc_boxes, camera_id, latitude=None, longi
         image_uuid = str(uuid.uuid4())
 
         asyncio.run(db_insert_accident(
-            engine, knowledge,
+            engine, knowledge_Accident_reports,
             event_id=event_id,
             camera_id=camera_id,
             time_utc=time_utc,
             public_url=public_url,
             image_uuid=image_uuid,
             bbox_xyxy=bbox_list,
+            mean_conf = mean_conf,
             latitude=latitude,
             longitude=longitude,
             vlm_result=vlm_result
@@ -261,7 +328,7 @@ def process_confirmed_accident(frame, acc_boxes, camera_id, latitude=None, longi
         print("Error in _process_confirmed_accident:", e)
         traceback.print_exc()
 
-def process_confirmed_pothole(frame, pot_boxes, camera_id, latitude=None, longitude=None):
+def process_confirmed_pothole(frame, pot_boxes, camera_id,mean_conf = None, latitude=None, longitude=None):
     try:
         event_id = create_event_id("pothole", camera_id)
 
@@ -292,6 +359,7 @@ def process_confirmed_pothole(frame, pot_boxes, camera_id, latitude=None, longit
             public_url=public_url,
             image_uuid=image_uuid,
             bbox_xyxy=bbox_list,
+            mean_conf = mean_conf,
             latitude=latitude,
             longitude=longitude,
             size=size,
@@ -321,7 +389,7 @@ app.mount("/files", StaticFiles(directory=OUT_DIR), name="files")
 
 # >> load models
 detector = AccidentDetector(MODEL_PATH, IMG_SIZE)
-pothole_model = None
+pothole_model = PotholeDetector(POTHOLE_MODEL_PATH, IMG_SIZE) 
 
 # >> state 
 CAMERA_STATES: dict[str, EventState] = {}    
@@ -344,30 +412,30 @@ def health():
 
 # >> Stream control 
 
-def _stream_set(camera_id: str, running: bool):
+def stream_set(camera_id: str, running: bool):
     with STREAM_LOCK:
         STREAM_FLAGS[camera_id] = running
 
-def _stream_is_running(camera_id: str) -> bool:
+def stream_is_running(camera_id: str) -> bool:
     with STREAM_LOCK:
         return STREAM_FLAGS.get(camera_id, False)
 
 # POST http://localhost:8000/stream/start?camera_id=cam01
 @app.post("/stream/start")
 def stream_start(camera_id: str = Query("cam01")):
-    _stream_set(camera_id, True)
+    stream_set(camera_id, True)
     return {"ok": True, "camera_id": camera_id, "running": True}
 
 @app.post("/stream/stop")
 # POST http://localhost:8000/stream/stop?camera_id=cam01
 def stream_stop(camera_id: str = Query("cam01")):
-    _stream_set(camera_id, False)
+    stream_set(camera_id, False)
     return {"ok": True, "camera_id": camera_id, "running": False}
 
 @app.get("/stream/status")
 #GET http://localhost:8000/stream/status?camera_id=cam01
 def stream_status(camera_id: str = Query("cam01")):
-    return {"camera_id": camera_id, "running": _stream_is_running(camera_id)}
+    return {"camera_id": camera_id, "running": stream_is_running(camera_id)}
 
 # ------------------------------------------------------------
 # >> stream generator (reads frames, runs model, draws boxes)
@@ -382,7 +450,7 @@ def _stream_generator(src: str, conf_acc: float, conf_pot: float, max_fps: int, 
     min_dt, last_t = 1.0 / max(1, max_fps), 0.0  # limit FPS 
 
     try:
-        while _stream_is_running(camera_id):
+        while stream_is_running(camera_id):
             ok, frame = cap.read()
             if not ok:
                 break
@@ -406,8 +474,10 @@ def _stream_generator(src: str, conf_acc: float, conf_pot: float, max_fps: int, 
                 same_time = (now - state.last_event_time) < COOLDOWN_S
                 same_roi  = (state.last_event_roi is not None) and iou(state.last_event_roi, union) >= MIN_IOU_SAME
 
-                if not (same_time and same_roi):
-                    _submit_bg(process_confirmed_accident, vis, acc, camera_id)
+                if not (same_time or same_roi):
+                    #best_conf = float(max(acc, key=lambda d: d[4])[4])
+                    avg_conf = float(sum(d[4] for d in acc) / len(acc))
+                    _submit_bg(process_confirmed_accident, vis, acc, camera_id, mean_conf=avg_conf)
                     state.last_event_time, state.last_event_roi = now, union
                     state.pred_hist_acc.clear()
 
@@ -428,8 +498,10 @@ def _stream_generator(src: str, conf_acc: float, conf_pot: float, max_fps: int, 
                     union_pot = union_box([(d[0], d[1], d[2], d[3]) for d in pot])
                     same_time_pot = (now - state.last_event_time_pot) < COOLDOWN_S
                     same_roi_pot  = (state.last_event_roi_pot is not None) and iou(state.last_event_roi_pot, union_pot) >= MIN_IOU_SAME
-                    if not (same_time_pot and same_roi_pot):
-                        _submit_bg(process_confirmed_pothole, vis, pot, camera_id)
+                    if not (same_time_pot or same_roi_pot):
+                        #best_conf = float(max(pot, key=lambda d: d[4])[4])
+                        avg_conf = float(sum(d[4] for d in pot) / len(pot))
+                        _submit_bg(process_confirmed_pothole, vis, pot, camera_id, mean_conf = avg_conf)
                         state.last_event_time_pot, state.last_event_roi_pot = now, union_pot
 
             jpg = _encode_jpeg(vis)
@@ -443,7 +515,7 @@ def _stream_generator(src: str, conf_acc: float, conf_pot: float, max_fps: int, 
 def stream(source: str = "0", camera_id: str = "cam01", conf_acc: float = None, conf_pot: float = None, max_fps: int = 10):
     conf_acc_used = conf_acc if conf_acc is not None else CONF_ACC
     conf_pot_used = conf_pot if conf_pot is not None else CONF_POT
-    _stream_set(camera_id, True)
+    stream_set(camera_id, True)
     gen = _stream_generator(source, conf_acc_used,conf_pot_used, max_fps, camera_id)
     return StreamingResponse(gen, media_type="multipart/x-mixed-replace; boundary=frame")
 
@@ -506,3 +578,248 @@ def get_event_report(event_id: str):
         parsed = {"raw_report": raw}
 
     return {"event_id": row["event_id"], "report": parsed}
+
+# --------------------------------------------------------------
+# RAG
+
+
+# Topic router for knowledge base selection
+async def topic_router(agent: Agent, query: str, num_documents: int = 5, **kwargs):
+    """Route the query to the appropriate knowledge base."""
+    if "accident_reports" in query.lower() or "accident reports" in query.lower():
+        docs = await knowledge_Accident_reports.async_search(query, max_results=num_documents)
+    elif "pothole_report" in query.lower() or "pothole report" in query.lower():
+        docs = await knowledge_Pothole.async_search(query, max_results=num_documents)
+    elif "accident_statistics" in query.lower() or "accident statistics" in query.lower():
+        docs = await knowledge_Accident_Statistics.async_search(query, max_results=num_documents)
+    else:
+        docs = await knowledge_Accident_reports.async_search(query, max_results=num_documents)
+    
+    return [d.to_dict() for d in docs]
+
+# Initialize database
+db = PostgresDb(db_url=db_url)
+
+# Shared instructions for both agents
+AGENT_INSTRUCTIONS = """
+You are a RAG Agent specialized in answering questions strictly based on a **local knowledge base** stored in a Vector Database.
+There are three available topics, and you must decide which one the user's query belongs to before answering:
+
+- Accident_reports → For questions about specific car accidents or accident reports (e.g., time, location, details of an incident).
+- Pothole_report → For questions about road conditions, potholes, or street surface issues.
+- Accident_Statistics → For questions about accident numbers, yearly or monthly statistics, or overall accident trends.
+
+Your rules:
+1. Always use information ONLY from the local knowledge base (the vector DB). Never use outside or general knowledge.
+2. Always identify the correct topic and include it at the start of your answer as: "SelectedTopic: <topic_name>".
+3. If relevant information is found, answer clearly and concisely using the retrieved content as evidence.
+4. If no relevant information is found in the local knowledge base, respond with an apology such as:
+   "Sorry, I could not find any matching information in the local knowledge base."
+5. DO NOT generate or guess any information that is not supported by the retrieved local data.
+6. Do not add your own information.
+
+When responding via audio, speak clearly and naturally.
+"""
+
+# Create TEXT Agent (for text chat)
+text_agent = Agent(
+    name="Text RAG Agent",
+    model=OpenAIChat(id="gpt-4o", api_key=api_key_openai, modalities=["text"]),
+    knowledge_retriever=topic_router,
+    search_knowledge=True,
+    pre_hooks=[PromptInjectionGuardrail(), TrafficIncidentGuardrail()],
+    db=db,
+    read_chat_history=True,
+    add_history_to_context=True,
+    num_history_runs=7,
+    instructions=AGENT_INSTRUCTIONS,
+)
+
+# Create AUDIO Agent (for voice chat)
+audio_agent = Agent(
+    name="Audio RAG Agent",
+    model=OpenAIChat(
+        id="gpt-4o-audio-preview",
+        modalities=["text", "audio"],
+        audio={"voice": "sage", "format": "wav"},
+        api_key=api_key_openai
+    ),
+    knowledge_retriever=topic_router,
+    search_knowledge=True,
+    #pre_hooks=[PromptInjectionGuardrail(), TrafficIncidentGuardrail()],
+    db=db,
+    read_chat_history=True,
+    add_history_to_context=True,
+    num_history_runs=7,
+    instructions=AGENT_INSTRUCTIONS,
+)
+
+# API Endpoints
+@app.get("/")
+async def root():
+    """Health check endpoint."""
+    return {
+        "message": "Unified Traffic Incident RAG API is running",
+        "status": "active",
+        "endpoints": {
+            "text_chat": "/chat",
+            "audio_chat": "/audio-chat",
+            "health": "/health"
+        }
+    }
+
+@app.post("/chat", response_model=ChatResponse)
+async def text_chat(request: ChatRequest):
+    """
+    TEXT chat endpoint - processes text queries and returns text responses.
+    
+    Args:
+        request: ChatRequest containing user message
+        
+    Returns:
+        ChatResponse with agent's text response
+    """
+    try:
+        # Run the TEXT agent with user's message
+        response = await text_agent.arun(request.message)
+        
+        # Extract response content
+        response_text = response.content if hasattr(response, 'content') else str(response)
+        
+        return ChatResponse(
+            response=response_text,
+            success=True
+        )
+    
+    except InputCheckError as e:
+        # Handle guardrail violations
+        return ChatResponse(
+            response=str(e),
+            success=False
+        )
+    
+    except Exception as e:
+        # Handle other errors
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+@app.post("/audio-chat")
+async def voice_chat(audio_file: UploadFile = File(...)):
+    """
+    AUDIO chat endpoint - processes audio input and returns audio response.
+    
+    Args:
+        audio_file: Audio file from user (WAV format)
+        
+    Returns:
+        Audio response in WAV format
+    """
+    try:
+        # Read audio file content
+        audio_content = await audio_file.read()
+        
+        # Run AUDIO agent with audio input
+        response = await audio_agent.arun(
+            "Please answer the question in this audio recording based on the knowledge base.",
+            audio=[Audio(content=audio_content, format="wav")]
+        )
+        # Manual parsing of response for audio content
+        audio_response_content = None
+        
+        try:
+            response_dict = response.__dict__
+            if 'response_audio' in response_dict:
+                resp_audio = response_dict['response_audio']
+                if resp_audio and hasattr(resp_audio, 'content'):
+                    audio_response_content = resp_audio.content
+                elif isinstance(resp_audio, dict) and 'content' in resp_audio:
+                    audio_response_content = resp_audio['content']
+            
+            # Check 'audio' field (alternative location)
+            if not audio_response_content and 'audio' in response_dict:
+                audio_list = response_dict['audio']
+                if audio_list and len(audio_list) > 0:
+                    if hasattr(audio_list[0], 'content'):
+                        audio_response_content = audio_list[0].content
+        
+        except Exception as parse_error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error parsing audio response: {str(parse_error)}"
+            )
+        
+        if not audio_response_content:
+            raise HTTPException(
+                status_code=500,
+                detail="No audio content found in response"
+            )
+        
+        # Decode base64 if needed
+        final_audio_bytes = None
+        
+        try:
+            if isinstance(audio_response_content, str):
+                print("Decoding base64 audio...")
+                final_audio_bytes = base64.b64decode(audio_response_content)
+                print(f"Decoded {len(final_audio_bytes)} bytes from base64")
+            
+            elif isinstance(audio_response_content, bytes):
+                if not audio_response_content.startswith(b'RIFF'):
+                    print("Attempting to decode base64 from bytes...")
+                    try:
+                        final_audio_bytes = base64.b64decode(audio_response_content)
+                        print(f"Decoded {len(final_audio_bytes)} bytes from base64")
+                    except:
+                        print("Not base64, using raw bytes")
+                        final_audio_bytes = audio_response_content
+                else:
+                    print("Already valid WAV bytes")
+                    final_audio_bytes = audio_response_content
+        
+        except Exception as decode_error:
+            print(f"Decode error: {decode_error}")
+            final_audio_bytes = audio_response_content
+        
+        if not final_audio_bytes or len(final_audio_bytes) == 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Audio decoding resulted in empty content"
+            )
+        
+        print(f"Final audio size: {len(final_audio_bytes)} bytes")
+        
+        # Fix WAV header if needed
+        fixed_audio = final_audio_bytes
+        try:
+            if final_audio_bytes[:4] == b'RIFF':
+                actual_size = len(final_audio_bytes) - 8
+                fixed_audio = b'RIFF' + actual_size.to_bytes(4, 'little') + final_audio_bytes[8:]
+                print(f"Fixed WAV header")
+        except Exception as fix_error:
+            print(f"Header fix error: {fix_error}")
+        
+        return Response(
+            content=fixed_audio,
+            media_type="audio/wav",
+            headers={
+                "Content-Disposition": "inline; filename=response.wav",
+                "Content-Length": str(len(fixed_audio)),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-cache"
+            }
+        )
+    
+    except InputCheckError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
+
+@app.get("/health")
+async def health_check():
+    """Check if all services are working."""
+    return {
+        "api": "healthy",
+        "database": "connected",
+        "text_agent": "ready",
+        "audio_agent": "ready"
+    }

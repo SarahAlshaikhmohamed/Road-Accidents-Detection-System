@@ -1,8 +1,8 @@
 import streamlit as st
 from streamlit_extras.switch_page_button import switch_page
-import streamlit_antd_components as sac
 from streamlit_lottie import st_lottie
 import json, pathlib, requests
+from components.ui import render_sidebar
 
 st.set_page_config(page_title="RADS: Road Accident Detection System", layout="wide")
 
@@ -11,36 +11,8 @@ css_path = pathlib.Path(__file__).parent / "style.css"
 if css_path.exists():
     st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 
-# to hide streamlit default sidebar and shrink the header 
-st.markdown("""
-<style>
-[data-testid="stSidebarNav"]{display:none;}
-header[data-testid="stHeader"]{height:12px;padding:0;box-shadow:none;background:transparent;}
-main .block-container{padding-top:.5rem;}
-</style>
-""", unsafe_allow_html=True)
-
-# Top menu 
-choice = sac.menu(
-    items=[
-        sac.MenuItem('Home', icon='house-fill'),
-        sac.MenuItem('Overview', icon='bar-chart-line-fill'),
-        sac.MenuItem('Accidents', icon='grid-3x3-gap-fill'),
-        sac.MenuItem('Live Stream', icon='camera-video-fill'),
-        sac.MenuItem('Chat', icon='chat-dots-fill'),
-    ],
-    index=0,
-    color='#004D61'
-)
-
-if choice == 'Overview':
-    switch_page('eda')
-elif choice == 'Accidents':
-    switch_page('accidents')
-elif choice == 'Live Stream':
-    switch_page('live stream')
-elif choice == 'Chat':
-    switch_page('chat')
+# sidebar
+render_sidebar() 
 
 # 
 st.markdown("""

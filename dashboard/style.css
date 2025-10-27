@@ -1,9 +1,9 @@
 :root{
-  --bg: #1A1A1A;
-  --surface: #232323;
-  --surface-2: #2C2C2C;
-  --text: #F0F0F0;
-  --text-muted: #C9CDD3;
+  --bg: #ffffff;
+  --surface: #d1d2d6;
+  --surface-2: #beb6b6;
+  --text: #101010;
+  --text-muted: #313233;
   --border: #3A3A3A;
 
   --accent-1: #004D61;   /* dark teal */
@@ -92,3 +92,70 @@ header[data-testid="stHeader"]{
 
 /* Utility */
 .center-title { text-align:center; margin: 32px 0 12px; }
+
+
+/* >> Chat page << */
+
+/* Page width wrapper used in chat.py */
+.rads-wrap{ max-width:1200px; margin:0 auto; }
+
+/* Hero / section cards */
+.rads-hero{
+  margin:12px 0 10px; padding:20px 22px;
+  border-radius:var(--radius); border:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(230, 225, 225, 0.06), rgba(224, 213, 213, 0));
+  box-shadow:var(--shadow);
+}
+.rads-hero h1{ margin:0 0 6px; font-size:1.9rem; font-weight:900; color:var(--text); }
+.rads-hero p{ margin:0; color:var(--text-muted); }
+
+.rads-card{
+  background:linear-gradient(180deg, var(--surface), var(--surface-2));
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.rads-pad{ padding:16px 18px; }
+
+/* Chip for current mode */
+.rads-pill{
+  display:inline-flex; gap:10px; align-items:center;
+  padding:10px 14px; border-radius:999px; border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-weight:800;
+}
+
+/* Chat bubbles */
+.rads-bubbles{ display:flex; flex-direction:column; gap:10px; }
+.rads-bubble{
+  max-width:900px; padding:12px 14px; border-radius:16px;
+  border:1px solid var(--border); box-shadow:var(--shadow);
+  white-space:pre-wrap; line-height:1.55;
+}
+.rads-bubble.user{ align-self:flex-end; background:rgba(0,199,165,.10); }
+.rads-bubble.assistant{ align-self:flex-start; background:rgba(255,255,255,.05); }
+
+/* Subtitles */
+.rads-h2{ font-size:1.15rem; font-weight:900; margin:0 0 10px; }
+
+/* Sidebar text tone + divider */
+.sidebar-muted{ color:var(--text-muted); font-size:.95rem; }
+.hr{ height:1px; background:var(--border); border:0; margin:12px 0; }
+
+/* Inputs to dark theme */
+.stSelectbox > div > div,
+.stTextInput > div > div,
+.stTextArea > div > textarea {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  border-radius: 12px !important;
+}
+
+/* Focus ring */
+:focus-visible { outline: none !important; }
+.stRadio [role="radio"]:focus { box-shadow: 0 0 0 2px var(--accent-1) inset !important; }
+
+/* Scrollbar */
+::-webkit-scrollbar { height:10px; width:10px; }
+::-webkit-scrollbar-thumb { background:#f2f3f5; border-radius:10px; border:2px solid #989393; }
+::-webkit-scrollbar-track { background:#f2f3f5; }

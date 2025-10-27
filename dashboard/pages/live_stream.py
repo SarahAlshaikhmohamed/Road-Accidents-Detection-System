@@ -1,5 +1,8 @@
 import os, requests, streamlit as st
 import streamlit_antd_components as sac
+from components.ui import render_sidebar
+from streamlit_extras.switch_page_button import switch_page
+import streamlit_antd_components as sac
 
 # Backend URL 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
@@ -12,6 +15,10 @@ conf = 0.75
 # >> Page Setup
 st.set_page_config(page_title="Live Stream Control", layout="wide")
 st.markdown("<h2 style='margin:0;'>Live Stream</h2>", unsafe_allow_html=True)
+
+# sidebar
+render_sidebar() 
+
 
 
 # >> state
@@ -51,7 +58,7 @@ try:
 except Exception as e:
     st.error(f"Load events failed: {e}")
 
-    
+
 st.markdown("<hr style='margin:0.75rem 0;'>", unsafe_allow_html=True)
 
 # Live view

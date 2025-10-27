@@ -1,23 +1,41 @@
-import os, json, requests
+import os, json, requests, pathlib, html
 import streamlit as st
-from streamlit_lottie import st_lottie
 from streamlit_extras.switch_page_button import switch_page
+from components.ui import render_sidebar
 
 # >> Backend URL (FastAPI : localhost:8000)
-
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 st.set_page_config(page_title="RADS – Accident Details", layout="wide")
 st.markdown("<h2 style='margin:0;'>Event details</h2>", unsafe_allow_html=True)
 
-# >> get selected event meta
-meta = st.session_state.get("event_details") or {}
-event_id = meta.get("event_id")
-thumb    = meta.get("thumbnail_url")
-camera   = meta.get("camera_id")
-utc_iso  = meta.get("time_utc")
+# sidebar
+render_sidebar() 
 
+# >> Load CSS
+css_path = pathlib.Path(__file__).parent / "style.css"
+if css_path.exists():
+    st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"] .main .block-container{padding-top:.5rem}
+    .rads-card{background:linear-gradient(180deg, #232323, #2C2C2C);border:1px solid #3A3A3A;
+               border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.35);overflow:hidden}
+    .rads-pad{padding:16px 18px}
+    .image-shell{position:relative;border:1px solid #3A3A3A;border-radius:16px;overflow:hidden}
+    .ribbon{position:absolute;top:12px;left:12px;z-index:2;padding:6px 12px;border-radius:12px;
+            color:#fff;font-weight:800;font-size:.92rem;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+    .kv{display:flex;gap:10px;margin:6px 0;align-items:flex-start;
+        border-bottom:1px dashed rgba(255,255,255,.08);padding-bottom:6px}
+    .kv .k{min-width:200px;opacity:.85;font-weight:800}
+    .kv .v{flex:1}
+    .hr{height:1px;background:#3A3A3A;border:0;margin:12px 0}
+    .meta-chip{display:inline-block;padding:6px 10px;border-radius:10px;
+               background:rgba(255,255,255,.06);border:1px solid #3A3A3A;font-weight:700}
+    </style>
+    """, unsafe_allow_html=True)
 
-# Colors
+# >> Helper functions
 SEV_COLORS = {
     "Low":     "#facc15",
     "Medium":  "#fb923c",
@@ -41,14 +59,19 @@ def kv_line(label: str, value):
         unsafe_allow_html=True
     )
 
-# >> top row header
+# >> Get event meta
+meta = st.session_state.get("event_details") or {}
+event_id = meta.get("event_id")
+thumb    = meta.get("thumbnail_url")
+camera   = meta.get("camera_id")
+utc_iso  = meta.get("time_utc")
+
+# >> Header info
 cols1, cols2 = st.columns([1, 1])
 with cols1:
     st.markdown(
-        f"<div style='display:inline-block;padding:6px 10px;border-radius:8px;"
-        f"background:rgba(0,0,0,.06);border:1px solid rgba(255,255,255,.12);'>"
-        f"<b>Event:</b> <code>{event_id}</code>"
-        f"</div>", unsafe_allow_html=True
+        f"<span class='meta-chip'><b>Event:</b> <code>{html.escape(str(event_id)) if event_id else '-'}</code></span>",
+        unsafe_allow_html=True
     )
     st.caption(f"Camera: {camera or '-'} • UTC: {utc_iso or '-'}")
 with cols2:
@@ -56,12 +79,6 @@ with cols2:
     if st.button("< Back to Dashboard"):
         switch_page("accidents")
     st.markdown("</div>", unsafe_allow_html=True)
-
-if thumb:
-    url = thumb
-    if url:
-        st.image(url)
-
 
 # Fetch Report
 r = requests.get(f"{BACKEND_URL}/events/{event_id}/report", timeout=30)
@@ -91,77 +108,56 @@ else:
     ribbon_text  = f"Severity: {severity or 'Unknown'}"
     ribbon_color = sev_color(severity)
 
-
-
 # Event details
-left, right= st.columns([7,9], gap = "large")
+left, right = st.columns([6, 10], gap="large")
+# >> Left card (image)
 with left:
-    st.markdown(
-        f"""
-        <div style="position:relative;border:1px solid var(--border);border-radius:var(--radius);
-                    box-shadow:var(--shadow);overflow:hidden;">
-            <span style="
-                position:absolute;top:10px;left:10px;background:{ribbon_color};
-                color:#fff;font-weight:800;font-size:.90rem;padding:6px 12px;border-radius:12px;
-                box-shadow:0 8px 28px rgba(0,0,0,.35);">{ribbon_text}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div class='image-shell'>", unsafe_allow_html=True)
+    st.markdown(f"<span class='ribbon' style='background:{ribbon_color};'>{html.escape(ribbon_text)}</span>", unsafe_allow_html=True)
     if thumb:
         st.image(thumb, use_column_width=True)
     else:
         st.caption("No image available.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# >> Right card
+with right:
+    #st.markdown("<div class='rads-card rads-pad'>", unsafe_allow_html=True)
 
     st.subheader("Overview")
-    st.write(f"**Category:** {category or '-'}")
-    st.write(f"**Contact level:** {contact_level or '-'}")
-    st.write(f"**Derivation object:** {derivation or '-'}")
-    st.write(f"**Vehicles count:** {vehicles_count if vehicles_count is not None else '-'}")
-
-with right:
-    st.markdown(
-        "<div style='border:1px solid var(--border);border-radius:var(--radius);"
-        "box-shadow:var(--shadow);padding:14px 16px;'>",
-        unsafe_allow_html=True
-    )
-
-    st.markdown("#### Details")
-
     kv_line("Category", category)
     kv_line("Contact level", contact_level)
     kv_line("Derivation object", derivation)
     kv_line("Vehicles count", vehicles_count)
-
     kv_line("Environment", environment)
     kv_line("Weather", weather)
     kv_line("Time of day", time_of_day)
     kv_line("Traffic lane", lane)
     kv_line("Emergency lights", emergency)
 
-    # Evidence 
+    # >> Evidence
     if evidence_list:
-        st.markdown("<div style='margin-top:10px;font-weight:800;'>Evidence</div>", unsafe_allow_html=True)
-        # if more, as points
-        for e in evidence_list:
-            st.markdown(f"- {e}")
+        st.markdown("<div class='hr'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-weight:800;'>Evidence</div>", unsafe_allow_html=True)
+        safe_items = "".join(f"<li>{html.escape(str(e))}</li>" for e in evidence_list)
+        st.markdown(f"<ul class='ev'>{safe_items}</ul>", unsafe_allow_html=True)
 
-    # the confidences  
+    # >> Confidences
     with st.expander("Confidences"):
         if conf:
             for k, v in conf.items():
-                kv_line(k, v)
+                kv_line(str(k), v)
         else:
             st.caption("No confidence scores available.")
 
-    # Actions
-    st.markdown("<hr>", unsafe_allow_html=True)
-    a1, a2, a3 = st.columns([1,1,2])
+    # >> Actions
+    st.markdown("<div class='hr'></div>", unsafe_allow_html=True)
+    a1, a2, _ = st.columns([1, 1, 2])
     with a1:
         st.download_button(
             "Download JSON report",
             data=json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8"),
-            file_name=f"{event_id or 'event'}_report.json",
+            file_name=f"{(event_id or 'event')}_report.json",
             mime="application/json",
             use_container_width=True,
         )
