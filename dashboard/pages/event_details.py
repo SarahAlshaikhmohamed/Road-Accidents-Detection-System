@@ -45,7 +45,7 @@ SEV_COLORS = {
 BLUE_FALSE_ALARM = "#3b82f6"
 
 def is_false_alarm(contact_level: str | None) -> bool:
-    return (contact_level or "").lower() in {"Unknown", "No-contact"}
+    return contact_level in {"Unknown", "No-contact"}
 
 def sev_color(severity: str | None) -> str:
     return SEV_COLORS.get((severity or "Unknown").title(), SEV_COLORS["Unknown"])
