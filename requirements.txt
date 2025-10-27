@@ -21,3 +21,4 @@ streamlit-lottie
 supabase
 psycopg2
 audio_recorder_streamlit 
+hijri-converter
