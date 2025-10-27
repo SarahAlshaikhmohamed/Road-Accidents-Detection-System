@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 DATA_PATH =  ROOT / "datasets" / "analytics" / "Traffic_Accident_Statistics.csv"
 
 # >> page config
-st.set_page_config(page_title="RADS | Overview", layout="wide")
+st.set_page_config(page_title="Buad | Overview", layout="wide")
 
 # sidebar
 render_sidebar() 
@@ -31,7 +31,7 @@ st.sidebar.header("Settings")
 city_filter = st.sidebar.text_input("Filter by City (type exact name)", key="region").strip()
 
 # >> title
-st.title("RADS: Road Accident Detection System")
+st.title("Buad (بُعد): Smart Road Monitoring System")
 
 # >> load dataset 
 def load_dataset(path: str):

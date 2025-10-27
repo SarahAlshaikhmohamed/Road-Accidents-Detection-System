@@ -6,7 +6,7 @@ from components.ui import render_sidebar
 
 # Page configuration
 st.set_page_config(
-    page_title="Traffic RAG Assistant",
+    page_title="Buad RAG Assistant",
     page_icon=":car:",
     layout="wide"
 )
@@ -26,58 +26,12 @@ if css_path.exists():
     st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 
 # --------
-st.markdown("""
-<style>
-/* page width wrapper */
-.rads-wrap{max-width:1200px;margin:0 auto;}
-/* hero card */
-.rads-hero{
-  margin:12px 0 10px; padding:20px 22px;
-  border-radius:var(--radius); border:1px solid var(--border);
-  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-  box-shadow:var(--shadow);
-}
-.rads-hero h1{margin:0 0 6px; font-size:1.9rem; font-weight:900; color:var(--text);}
-.rads-hero p {margin:0; color:var(--text-muted);}
-
-/* generic card + padding */
-.rads-card{background:linear-gradient(180deg, var(--surface), var(--surface-2));
-  border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);}
-.rads-pad{padding:16px 18px;}
-
-/* mode pill */
-.rads-pill{
-  display:inline-flex; gap:10px; align-items:center;
-  padding:10px 14px; border-radius:999px; border:1px solid var(--border);
-  background:var(--surface-2); color:var(--text); font-weight:800;
-}
-
-/* bubbles for chat history */
-.rads-bubbles{display:flex; flex-direction:column; gap:10px;}
-.rads-bubble{
-  max-width:900px; padding:12px 14px; border-radius:16px;
-  border:1px solid var(--border); box-shadow:var(--shadow);
-  white-space:pre-wrap; line-height:1.55;
-}
-.rads-bubble.user{align-self:flex-end; background:rgba(0,199,165,.10);}
-.rads-bubble.assistant{align-self:flex-start; background:rgba(255,255,255,.05);}
-
-/* titles */
-.rads-h2{font-size:1.15rem; font-weight:900; margin:0 0 10px;}
-
-/* tidy sidebar text */
-.sidebar-muted{color:var(--text-muted); font-size:.95rem;}
-/* horizontal rule soft */
-.hr{height:1px;background:var(--border);border:0;margin:12px 0;}
-</style>
-""", unsafe_allow_html=True)
-
 # App title 
-st.markdown('<div class="rads-wrap">', unsafe_allow_html=True)
+st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
 st.markdown("""
-<div class="rads-hero">
-  <h1>Traffic Incident RAG Assistant</h1>
-  <p><b>Unified System</b> - Ask questions using Text or Voice about:</p>
+<div class="buad-hero">
+  <h1>Buad RAG Assistant</h1>
+  <p><b>Ask questions using Text or Voice about:</p>
   <ul style="margin:.4rem 0 0 1.1rem; color:var(--text-muted);">
     <li><b>Accident Reports</b> - Specific accident incidents</li>
     <li><b>Pothole Reports</b> - Road conditions</li>
@@ -99,7 +53,7 @@ with st.sidebar:
         help="Switch between text typing and voice recording"
     )
 
-    st.markdown("---")
+    #st.markdown("---")
     st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
     st.markdown("### Available Topics:")
     st.markdown(
@@ -129,7 +83,7 @@ with st.sidebar:
         health_response = requests.get(HEALTH_URL, timeout=5)
         if health_response.status_code == 200:
             st.success("API Connected")
-            st.json(health_response.json())
+            #st.json(health_response.json())
         else:
             st.error("API Error")
     except Exception:
@@ -150,25 +104,25 @@ if "audio_messages" not in st.session_state:
     st.session_state.audio_messages = []
 
 # Display mode indicator 
-st.markdown('<div class="rads-wrap">', unsafe_allow_html=True)
+st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
 st.markdown(
-    f'<div class="rads-card rads-pad"><span class="rads-pill">Current Mode: {chat_mode}</span></div>',
+    f'<div class="buad-card buad-pad"><span class="buad-pill">Current Mode: {chat_mode}</span></div>',
     unsafe_allow_html=True
 )
 
 #-----------------------------------------------
 # >> TEXT CHAT MODE 
 if chat_mode == "Text Chat":
-    st.markdown('<div class="rads-wrap">', unsafe_allow_html=True)
-    #st.markdown('<div class="rads-card rads-pad" style="margin-top:12px;">', unsafe_allow_html=True)
-    st.markdown('<div class="rads-h2">Text Conversation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
+    #st.markdown('<div class="buad-card buad-pad" style="margin-top:12px;">', unsafe_allow_html=True)
+    st.markdown('<div class="buad-h2">Text Conversation</div>', unsafe_allow_html=True)
 
     # Display text chat history 
-    st.markdown('<div class="rads-bubbles">', unsafe_allow_html=True)
+    st.markdown('<div class="buad-bubbles">', unsafe_allow_html=True)
     for message in st.session_state.messages:
         role = message["role"]
         cls = "user" if role == "user" else "assistant"
-        st.markdown(f'<div class="rads-bubble {cls}">{message["content"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="buad-bubble {cls}">{message["content"]}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Text input 
@@ -177,7 +131,7 @@ if chat_mode == "Text Chat":
     if user_input:
         # Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
-        st.markdown(f'<div class="rads-bubble user">{user_input}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="buad-bubble user">{user_input}</div>', unsafe_allow_html=True)
 
         # Get response
         with st.spinner("Thinking..."):
@@ -193,7 +147,7 @@ if chat_mode == "Text Chat":
 
                     if data["success"]:
                         assistant_message = data["response"]
-                        st.markdown(f'<div class="rads-bubble assistant">{assistant_message}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="buad-bubble assistant">{assistant_message}</div>', unsafe_allow_html=True)
                     else:
                         assistant_message = f" {data['response']}"
                         st.warning(assistant_message)
@@ -233,12 +187,22 @@ if chat_mode == "Text Chat":
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # Footer
+    st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
+    st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; color: var(--text-muted);'>
+        <small>Buad RAG System | Text & Voice | Powered by OpenAI & Agno</small>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 #-----------------------------------------------
 # >> AUDIO CHAT MODE 
 elif chat_mode == "Voice Chat":
-    st.markdown('<div class="rads-wrap">', unsafe_allow_html=True)
-    #st.markdown('<div class="rads-card rads-pad" style="margin-top:12px;">', unsafe_allow_html=True)
-    st.markdown('<div class="rads-h2">Voice Conversation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
+    #st.markdown('<div class="buad-card buad-pad" style="margin-top:12px;">', unsafe_allow_html=True)
+    st.markdown('<div class="buad-h2">Voice Conversation</div>', unsafe_allow_html=True)
 
     # Audio recorder
     st.markdown("*Click the microphone to start/stop recording:*")
@@ -345,12 +309,12 @@ elif chat_mode == "Voice Chat":
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Footer
-st.markdown('<div class="rads-wrap">', unsafe_allow_html=True)
-st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
-st.markdown("""
-<div style='text-align: center; color: var(--text-muted);'>
-    <small>Unified Traffic Incident RAG System | Text & Voice | Powered by OpenAI & Agno</small>
-</div>
-""", unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
+    # Footer
+    st.markdown('<div class="buad-wrap">', unsafe_allow_html=True)
+    st.markdown('<div class="hr"></div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; color: var(--text-muted);'>
+        <small>Buad RAG System | Text & Voice | Powered by OpenAI & Agno</small>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)

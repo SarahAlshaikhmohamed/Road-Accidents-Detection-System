@@ -8,8 +8,8 @@ from components.ui import render_sidebar
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # >> Page Setup 
-st.set_page_config(page_title="RADS Dashboard", layout="wide")
-st.title("RADS Dashboard")
+st.set_page_config(page_title="Buad Dashboard", layout="wide")
+st.title("Buad Dashboard")
 
 # sidebar
 render_sidebar() 

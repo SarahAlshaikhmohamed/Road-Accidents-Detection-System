@@ -48,8 +48,8 @@ def render_sidebar():
         else:
             st.markdown('<div class="rads-sb-logo">R</div>', unsafe_allow_html=True)
         st.markdown(
-            '<div><div class="rads-sb-title">RADS</div>'
-            '<div class="rads-sb-sub">Road Accident Detection System</div></div>',
+            '<div><div class="rads-sb-title">Buad | بُعد</div>'
+            '<div class="rads-sb-sub">sub title</div></div>',
             unsafe_allow_html=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -65,10 +65,10 @@ def render_sidebar():
         st.markdown('<div class="rads-sb-hr"></div>', unsafe_allow_html=True)
 
         # >> About
-        st.markdown("About the project")
+        st.markdown('<div><div class="rads-sb-title">About the project</div>', unsafe_allow_html=True)
         st.markdown(
             "<div class='rads-sb-about'>"
-            "RADS is a system for real time accident & pothole detection, incident reporting, "
+            "Buad is a system for real time accident & pothole detection, incident reporting, "
             "and analytics. Built with Streamlit & FastAPI, it connects live streams, detection "
             "models, and an RAG assistant for querying reports."
             "</div>",
