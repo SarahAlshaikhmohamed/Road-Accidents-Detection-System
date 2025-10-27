@@ -95,7 +95,8 @@ async def db_insert_accident( engine, knowledge, *,
     # >> Accident_reports
     try:
         #if knowledge is not None and vlm_result is not None:
-            text_content = json.dumps(vlm_result, ensure_ascii=False).replace('"', '')
+            #text_content = json.dumps(vlm_result, ensure_ascii=False).replace('"', '')
+            text_content = json.dumps(vlm_result).replace('"', '') 
             metadata = {"image_id": image_uuid, "event_id": event_id, "camera_id": camera_id}
             await knowledge.add_content_async(text_content=text_content, metadata=metadata)
     except Exception as e:
