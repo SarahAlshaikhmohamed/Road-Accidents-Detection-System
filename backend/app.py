@@ -32,6 +32,13 @@ from agno.guardrails import BaseGuardrail, PromptInjectionGuardrail
 from agno.run.team import TeamRunInput
 from agno.media import Audio
 import base64
+
+#---------------------------------
+#Interface
+from fastapi import Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
 #----------------------------------
 # Accident Detector
 from backend.accident_detector import AccidentDetector
@@ -299,6 +306,10 @@ def process_confirmed_accident(frame, acc_boxes, camera_id,mean_conf = None, lat
         # VLM --> returns dict 
         vlm_result = analyze_image_with_vlm(image_bytes=img_bytes, image_id=event_id)  
 
+        # Filter (Like if there is false alarms that detected, the vlm will say its not an accident)
+        #    If vlm_result["Contact_level"] == "No-contact" or "Unknown"
+        #    we will treat it as false alarm -> do NOT upload, do NOT insert DB
+
         # get signed URL
         dest_path = f"{camera_id}/{event_id}.jpg"
         public_url = upload_image_to_supabase(img_bytes, dest_path)  
@@ -387,6 +398,13 @@ app.add_middleware(
 # >> Serve outputs directory under /files
 app.mount("/files", StaticFiles(directory=OUT_DIR), name="files")
 
+# Static (already serving /files). Add a /static for CSS/icons.
+app.mount("/static", StaticFiles(directory=os.path.join(PROJECT_ROOT, "..", "static")), name="static")
+
+# Templates
+TEMPLATES_DIR = os.path.join(PROJECT_ROOT, "..", "templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
 # >> load models
 detector = AccidentDetector(MODEL_PATH, IMG_SIZE)
 pothole_model = PotholeDetector(POTHOLE_MODEL_PATH, IMG_SIZE) 
@@ -405,11 +423,6 @@ def get_state(camera_id: str, fps: float):
     return st
 
 #---------------------------------------
-# >> System health check
-@app.get("/health")
-def health():
-    return {"status": "ok", "model": MODEL_PATH}
-
 # >> Stream control 
 
 def stream_set(camera_id: str, running: bool):
@@ -655,7 +668,7 @@ audio_agent = Agent(
 )
 
 # API Endpoints
-@app.get("/")
+@app.get("/api")
 async def root():
     """Health check endpoint."""
     return {
@@ -823,3 +836,43 @@ async def health_check():
         "text_agent": "ready",
         "audio_agent": "ready"
     }
+
+# >> UI ROUTES 
+
+@app.get("/home", response_class=HTMLResponse)
+def ui_home(request: Request):
+    return templates.TemplateResponse("home.html", {"request": request})
+
+@app.get("/ui/live", response_class=HTMLResponse)
+def ui_live(request: Request, camera_id: str = "cam01"):
+    return templates.TemplateResponse("live.html", {"request": request, "camera_id": camera_id})
+
+@app.get("/ui/dashboard", response_class=HTMLResponse)
+def ui_dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/ui/chat", response_class=HTMLResponse)
+def ui_chat(request: Request):
+    return templates.TemplateResponse("chat.html", {"request": request})
+
+#  dashboard cards
+@app.get("/partials/events", response_class=HTMLResponse)
+def partial_events(request: Request, limit: int = 24):
+    # reuse your DB query
+    stmt = text("""
+        SELECT event_id, camera_id, time_utc, mean_conf, thumbnail_url
+        FROM public.incidents ORDER BY time_utc DESC LIMIT :limit
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(stmt, {"limit": limit}).mappings().all()
+    return templates.TemplateResponse("_events.html", {"request": request, "events": rows})
+
+@app.get("/partials/potholes", response_class=HTMLResponse)
+def partial_potholes(request: Request, limit: int = 24):
+    stmt = text("""
+        SELECT event_id, camera_id, time_utc, size, thumbnail_url
+        FROM public.potholes ORDER BY time_utc DESC LIMIT :limit
+    """)
+    with engine.connect() as conn:
+        rows = conn.execute(stmt, {"limit": limit}).mappings().all()
+    return templates.TemplateResponse("_events.html", {"request": request, "potholes": rows})

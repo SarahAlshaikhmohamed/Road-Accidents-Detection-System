@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buad | Event Details</title>
+
+  <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <nav class="container flex-between">
+      <a href="/" class="brand">Buad</a>
+      <ul class="nav">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/ui/live">Live</a></li>
+        <li><a class="active" href="/ui/dashboard">Dashboard</a></li>
+        <li><a href="/ui/chat">Chatbot</a></li>
+      </ul>
+      <a class="icon-btn" href="/ui/dashboard" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    </nav>
+  </header>
+
+  <section class="hero container">
+    <div>
+      <h1>Event details</h1>
+      <p class="small">Structured VLM JSON report with thumbnail and metadata.</p>
+    </div>
+  </section>
+
+  <section class="section container" id="content">
+    <div class="image-shell">
+      <span id="ribbon" class="ribbon">Severity</span>
+      <img id="thumb" class="thumb" alt="thumbnail" src="">
+    </div>
+
+    <hr class="sep"/>
+
+    <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div>
+        <h3>Overview</h3>
+        <div class="kv" id="kv-over"></div>
+      </div>
+      <div>
+        <h3>Scene</h3>
+        <div class="kv" id="kv-scene"></div>
+      </div>
+      <div>
+        <h3>Traffic</h3>
+        <div class="kv" id="kv-traffic"></div>
+      </div>
+    </div>
+
+    <hr class="sep"/>
+
+    <div class="grid" style="grid-template-columns: 1fr 1fr;">
+      <div>
+        <h3>Evidence</h3>
+        <div id="ev-list" class="small note">No evidence items.</div>
+      </div>
+      <div>
+        <h3>Confidence</h3>
+        <div id="kv-conf" class="kv"></div>
+      </div>
+    </div>
+
+    <hr class="sep"/>
+
+    <div class="tabs">
+      <a id="rawLink" class="btn" target="_blank" rel="noopener">Open raw JSON</a>
+      <a id="dlLink" class="btn btn-ghost" download>Download report</a>
+      <a id="imgLink" class="btn btn-ghost" target="_blank" rel="noopener">Open image</a>
+    </div>
+  </section>
+
+  <div class="footer-gap"></div>
+
+  <script>
+    "use strict";
+
+    const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
+    const params = new URLSearchParams(location.search);
+    const eventId = params.get("id");
+
+    const SEV_COLORS = { Low:"#facc15", Medium:"#fb923c", High:"#ef4444", Unknown:"#9ca3af" };
+    const BLUE_FALSE = "#3b82f6";
+
+    function el(id){ return document.getElementById(id); }
+    function kv(container, k, v){
+      const node = document.createElement("div");
+      node.className = "kv";
+      node.innerHTML = `<div class="k">${k}</div><div class="v">${v ?? "-"}</div>`;
+      container.appendChild(node);
+    }
+
+    async function fetchJSON(url){
+      const r = await fetch(url);
+      if(!r.ok) throw new Error(String(r.status));
+      return r.json();
+    }
+
+    function isFalseAlarm(contact){ const t=(contact||"").trim(); return t==="No-contact" || t==="Unknown"; }
+
+    async function boot(){
+      if(!eventId){ el("content").innerHTML = "<div class='small'>Missing event id.</div>"; return; }
+
+      // basic meta
+      let meta = {};
+      try{
+        const list = await fetchJSON(`${BACKEND}/events?limit=1&id=${encodeURIComponent(eventId)}`).catch(()=>({events:[]}));
+        meta = (list.events || []).find(e=>e.event_id===eventId) || {};
+      }catch{}
+
+      const repPayload = await fetchJSON(`${BACKEND}/events/${eventId}/report`);
+      const rep = repPayload.report || {};
+
+      // thumbnail
+      el("thumb").src = meta.thumbnail_url || "";
+      el("imgLink").href = meta.thumbnail_url || "#";
+      el("rawLink").href = `${BACKEND}/events/${eventId}/report`;
+      el("dlLink").href  = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(rep,null,2))}`;
+      el("dlLink").download = `${eventId}_report.json`;
+
+      const sev = rep.Severity || "Unknown";
+      const contact = rep.Contact_level || "Unknown";
+      const fa = isFalseAlarm(contact);
+      const rib = el("ribbon");
+      rib.textContent = fa ? "False Alarm" : `Severity: ${sev}`;
+      rib.style.background = fa ? BLUE_FALSE : (SEV_COLORS[sev] || SEV_COLORS.Unknown);
+
+      // groups
+      const over = document.getElementById("kv-over");
+      const scene = document.getElementById("kv-scene");
+      const traf = document.getElementById("kv-traffic");
+      const conf = document.getElementById("kv-conf");
+
+      kv(over, "Event ID", eventId);
+      kv(over, "Camera", meta.camera_id || "-");
+      kv(over, "UTC Time", meta.time_utc || "-");
+      kv(over, "Category", rep.Category);
+      kv(over, "Severity", sev);
+      kv(over, "Contact level", contact);
+      kv(over, "Vehicles count", rep.Vehicles_count);
+
+      kv(scene, "Environment", rep.Environment);
+      kv(scene, "Weather", rep.Weather);
+      kv(scene, "Time of day", rep.Time);
+      kv(scene, "Derivation object", rep.Derivation_object);
+
+      kv(traf, "Traffic lane", rep.Traffic_lane_of_the_object);
+      kv(traf, "Emergency lights", rep.Emergency_lights);
+
+      // evidence
+      const ev = rep.Evidence || [];
+      const evBox = document.getElementById("ev-list");
+      if(ev.length){
+        evBox.innerHTML = "<ul>"+ev.map(x=>`<li>${String(x)}</li>`).join("")+"</ul>";
+      }else{
+        evBox.textContent = "No evidence items.";
+      }
+
+      // confidences
+      const c = rep.Confidence || {};
+      if(Object.keys(c).length){
+        Object.entries(c).forEach(([k,v])=> kv(conf, k, v));
+      }else{
+        conf.innerHTML = "<div class='small'>No confidence scores.</div>";
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Buad</title>
+    <link rel="stylesheet" href="/static/style.css"/>
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="inner">
+        <div class="brand">Buad</div>
+        <nav class="site-links">
+          <a href="/">Home</a>
+          <a href="/ui/live">Live</a>
+          <a href="/ui/dashboard">Dashboard</a>
+          <a href="/ui/chat">Chat</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

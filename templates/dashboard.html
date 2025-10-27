@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buad | Dashboard</title>
+
+  <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <!-- Header -->
+<header class="site-header">
+  <nav class="container flex-between">
+    <a href="/" class="brand">Buad</a>
+    <ul class="nav">
+      <li><a class="active-home" href="/">Home</a></li>
+      <li><a href="/ui/live">Live</a></li>
+      <li><a href="active">Dashboard</a></li>
+      <li><a href="/ui/chat">Chatbot</a></li>
+    </ul>
+    <button class="icon-btn" title="Dark theme only"><i class="fa-solid fa-moon"></i></button>
+  </nav>
+</header>
+
+  <!-- Hero -->
+  <section class="hero container">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Monitor accidents and potholes detected by Buad in real time. Filter by date, severity, or false alarms and drill into event details.</p>
+      <div class="tabs" style="margin-top:1rem">
+        <button id="tab-acc" class="btn-chip active"><i class="fa-solid fa-car-burst"></i> Accidents</button>
+        <button id="tab-pot" class="btn-chip"><i class="fa-solid fa-road"></i> Potholes</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="section container">
+    <div class="filter-bar">
+      <div class="filter-grid">
+        <div class="field" style="grid-column:span 3;">
+          <label>From</label>
+          <input type="date" id="fromDate">
+        </div>
+        <div class="field" style="grid-column:span 3;">
+          <label>To</label>
+          <input type="date" id="toDate">
+        </div>
+
+        <!-- Accidents-only controls -->
+        <div id="acc-only" class="field" style="grid-column:span 3;">
+          <label>False alarms</label>
+          <select id="faMode">
+            <option>All</option>
+            <option>Exclude</option>
+            <option>Only</option>
+          </select>
+        </div>
+        <div id="acc-sev" class="field" style="grid-column:span 3;">
+          <label>Severity</label>
+          <div class="pillset" id="sevPills">
+            <span class="pill" data-v="High">High</span>
+            <span class="pill" data-v="Medium">Medium</span>
+            <span class="pill" data-v="Low">Low</span>
+            <span class="pill" data-v="Unknown">Unknown</span>
+            <span class="pill" id="sevAll">Select all</span>
+          </div>
+        </div>
+
+        <!-- Potholes-only controls -->
+        <div id="pot-only" class="field" style="grid-column:span 6; display:none">
+          <label>Pothole size</label>
+          <div class="pillset" id="sizePills">
+            <span class="pill" data-v="small">small</span>
+            <span class="pill" data-v="medium">medium</span>
+            <span class="pill" data-v="large">large</span>
+            <span class="pill" id="sizeAll">Select all</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div id="grid-acc" class="grid"></div>
+    <div id="grid-pot" class="grid" style="display:none"></div>
+
+    <div style="display:flex; justify-content:center; margin-top:1.2rem">
+      <button id="loadMore" class="btn btn-ghost">Load more</button>
+    </div>
+  </section>
+
+  <div class="footer-gap"></div>
+
+  <!-- Script -->
+  <script>
+    "use strict";
+
+    const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
+
+    // Elements
+    const tabAcc = document.getElementById("tab-acc");
+    const tabPot = document.getElementById("tab-pot");
+    const gridAcc = document.getElementById("grid-acc");
+    const gridPot = document.getElementById("grid-pot");
+    const loadMore = document.getElementById("loadMore");
+
+    const fromDate = document.getElementById("fromDate");
+    const toDate = document.getElementById("toDate");
+    const faMode = document.getElementById("faMode");
+
+    const accOnly = document.getElementById("acc-only");
+    const accSev = document.getElementById("acc-sev");
+    const potOnly = document.getElementById("pot-only");
+
+    const sevPills = document.getElementById("sevPills");
+    const sizePills = document.getElementById("sizePills");
+
+    // State
+    let mode = "acc";
+    let shown = 12;
+    let accAll = [];
+    let potAll = [];
+    const sevSet = new Set();
+    const sizeSet = new Set();
+
+    const SEV_COLORS = { Low:"#facc15", Medium:"#fb923c", High:"#ef4444", Unknown:"#9ca3af" };
+    const BLUE_FALSE = "#3b82f6";
+    const isFalseAlarm = c => (c || "").trim() === "No-contact" || (c || "").trim() === "Unknown";
+    const sevColor = s => SEV_COLORS[(s || "Unknown")];
+
+    function withinDate(iso, from, to){
+      if (!iso) return true;
+      try{
+        const d = new Date(iso.replace("Z",""));
+        if (from && d < new Date(from)) return false;
+        if (to && d > new Date(to)) return false;
+        return true;
+      }catch(e){return true;}
+    }
+
+    function pillSetup(container, set, selectAllId){
+      container.addEventListener("click", e=>{
+        const p = e.target.closest(".pill");
+        if (!p) return;
+        if (p.id === selectAllId){
+          const pills = [...container.querySelectorAll(".pill[data-v]")];
+          const anyOff = pills.some(x=>!x.classList.contains("active"));
+          set.clear();
+          pills.forEach(x=>{
+            if (anyOff){ x.classList.add("active"); set.add(x.dataset.v); }
+            else { x.classList.remove("active"); }
+          });
+          render();
+          return;
+        }
+        const v = p.dataset.v;
+        if (!v) return;
+        if (p.classList.contains("active")){ p.classList.remove("active"); set.delete(v); }
+        else { p.classList.add("active"); set.add(v); }
+        render();
+      });
+    }
+
+    pillSetup(sevPills,  sevSet,  "sevAll");
+    pillSetup(sizePills, sizeSet, "sizeAll");
+
+    function cardHTML(o){
+      return `
+        <div class="card">
+          <span class="badge" style="background:${o.badgeColor}">${o.badgeText}</span>
+          <img class="thumb" src="${o.img || ""}" alt="thumb">
+          <div class="meta">
+            <div class="row"><div class="cam">${o.cam || "-"}</div><div class="utc">${o.utc || "-"}</div></div>
+            <div style="opacity:.75; font-size:.9rem; margin-top:4px;">Event: ${o.id}</div>
+          </div>
+          <a class="btn btn-ghost view-btn" href="/ui/event?id=${encodeURIComponent(o.id)}" style="margin:0 14px 14px">View details</a>
+        </div>
+      `;
+    }
+
+    async function fetchJSON(url){
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(String(r.status));
+      return r.json();
+    }
+
+    async function enrichReport(id){
+      try{
+        const r = await fetchJSON(`${BACKEND}/events/${id}/report`);
+        const rep = r.report || {};
+        return { Severity: rep.Severity || "Unknown", Contact: rep.Contact_level || "Unknown" };
+      }catch(e){ return {Severity:"Unknown", Contact:"Unknown"}; }
+    }
+
+    async function loadData(){
+      const ev = await fetchJSON(`${BACKEND}/events?limit=300`);
+      const ph = await fetchJSON(`${BACKEND}/potholes?limit=300`);
+      accAll = ev.events || [];
+      potAll = ph.potholes || [];
+      render();
+    }
+
+    function pick(arr, n){ return arr.slice(0, Math.max(0, n)); }
+
+    function render(){
+      gridAcc.innerHTML = "";
+      gridPot.innerHTML = "";
+
+      if (mode === "acc"){
+        const from = fromDate.value, to = toDate.value;
+        const base = accAll.filter(e => withinDate(e.time_utc, from, to));
+        const slice = pick(base, shown);
+
+        Promise.all(slice.map(async e=>{
+          const rep = await enrichReport(e.event_id);
+          const fa = isFalseAlarm(rep.Contact);
+          const faModeVal = faMode.value;
+          if ((faModeVal === "Exclude" && fa) || (faModeVal === "Only" && !fa)) return null;
+          if (sevSet.size && !sevSet.has(rep.Severity)) return null;
+
+          return cardHTML({
+            img:e.thumbnail_url, cam:e.camera_id, utc:e.time_utc, id:e.event_id,
+            badgeText: fa ? "False Alarm" : `Severity: ${rep.Severity}`,
+            badgeColor: fa ? BLUE_FALSE : sevColor(rep.Severity)
+          });
+        })).then(cards=>{
+          const out = cards.filter(Boolean).join("");
+          gridAcc.innerHTML = out || '<div class="small">No accident events to show with current filters.</div>';
+        });
+
+        accOnly.style.display = "";
+        accSev.style.display = "";
+        potOnly.style.display = "none";
+        gridAcc.style.display = "";
+        gridPot.style.display = "none";
+      }else{
+        const from = fromDate.value, to = toDate.value;
+        const base = potAll.filter(p => withinDate(p.time_utc, from, to));
+        const slice = pick(base, shown);
+        const out = slice
+          .filter(p => !sizeSet.size || sizeSet.has(String(p.size||"").toLowerCase()))
+          .map(p => cardHTML({
+            img:p.thumbnail_url, cam:p.camera_id, utc:p.time_utc, id:p.event_id,
+            badgeText:`Pothole: ${p.size || "-"}`, badgeColor:"#0ea5e9"
+          }))
+          .join("");
+        gridPot.innerHTML = out || '<div class="small">No pothole events to show with current filters.</div>';
+
+        accOnly.style.display = "none";
+        accSev.style.display = "none";
+        potOnly.style.display = "";
+        gridAcc.style.display = "none";
+        gridPot.style.display = "";
+      }
+    }
+
+    // Tab toggles
+    tabAcc.addEventListener("click", ()=>{ mode="acc"; shown=12; tabAcc.classList.add("active"); tabPot.classList.remove("active"); render(); });
+    tabPot.addEventListener("click", ()=>{ mode="pot"; shown=12; tabPot.classList.add("active"); tabAcc.classList.remove("active"); render(); });
+
+    // Filter events
+    [fromDate, toDate, faMode].forEach(el => el.addEventListener("change", ()=>{ shown=12; render(); }));
+
+    // Load more
+    loadMore.addEventListener("click", ()=>{ shown += 12; render(); });
+
+    // Boot
+    loadData();
+  </script>
+</body>
+</html>
