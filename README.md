@@ -8,7 +8,7 @@
 
 ## Introduction
 
-**Buad** is an intelligent road-safety monitoring platform that:
+**Buad** is an intelligent road safety monitoring platform that:
 
 * Detects **accidents** and **potholes** from **live camera feeds**
 * Generates **structured reports** using a Vision-Language Model (VLM)
@@ -49,11 +49,6 @@ Buad integrates multiple AI components into one seamless platform:
 ### Frontend
 
 * HTML, CSS, JavaScript
-
-### AI / NLP
-
-* OpenAI embeddings + hybrid vector search
-* RAG agents for text & audio queries
 
 ---
 
