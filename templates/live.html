@@ -27,7 +27,7 @@
   <section class="hero container">
     <div>
       <h1>Live Stream</h1>
-      <p>Start or stop the camera stream and view detections in real time. Matches Streamlit behavior with Start/Stop actions.</p>
+      <p>Start or stop the camera stream and view detections in real time.</p>
       <div class="tabs" style="margin-top:1rem">
         <span id="runBadge" class="btn-chip" style="pointer-events:none;opacity:.9">Status: Stopped</span>
       </div>
@@ -37,21 +37,13 @@
   <section class="section container">
     <div class="filter-bar">
       <div class="filter-grid">
-        <div class="field" style="grid-column:span 3;">
+        <div class="field" style="grid-column:span 6;">
           <label>Camera ID</label>
           <input id="camId" type="text" value="cam01"/>
         </div>
-        <div class="field" style="grid-column:span 3;">
+        <div class="field" style="grid-column:span 6;">
           <label>Source</label>
           <input id="source" type="text" value="0"/>
-        </div>
-        <div class="field" style="grid-column:span 3;">
-          <label>Max FPS</label>
-          <input id="fps" type="number" min="1" max="60" step="1" value="10"/>
-        </div>
-        <div class="field" style="grid-column:span 3;">
-          <label>Confidence (0–1)</label>
-          <input id="conf" type="number" min="0" max="1" step="0.01" value="0.75"/>
         </div>
       </div>
 
@@ -78,14 +70,10 @@
   <script>
     "use strict";
 
-    // Backend base
     const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
 
-    // Elements
     const camId   = document.getElementById("camId");
     const source  = document.getElementById("source");
-    const fps     = document.getElementById("fps");
-    const conf    = document.getElementById("conf");
     const runBadge= document.getElementById("runBadge");
     const startBtn= document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
@@ -108,15 +96,13 @@
     function streamUrl(){
       const params = new URLSearchParams({
         camera_id: camId.value.trim() || "cam01",
-        source:    source.value.trim() || "0",
-        max_fps:   String(Math.max(1, Math.min(60, Number(fps.value) || 10))),
-        conf_acc:  String(Math.max(0, Math.min(1, Number(conf.value) || 0.75)))
+        source:    source.value.trim() || "0"
       });
       return `${BACKEND}/stream?${params.toString()}`;
     }
 
     async function post(url){
-      const r = await fetch(url, { method: "POST" });
+      const r = await fetch(url, { method:"POST" });
       if(!r.ok) throw new Error(String(r.status));
       return r.json().catch(()=> ({}));
     }
@@ -128,7 +114,7 @@
         await post(`${BACKEND}/stream/start?camera_id=${encodeURIComponent(cid)}`);
         img.src = streamUrl();
         setRunning(true);
-        msg.textContent = "Stream flag set to RUNNING";
+        msg.textContent = "Stream running";
       }catch(e){
         msg.textContent = "Failed to start stream.";
       }
@@ -140,7 +126,7 @@
         const cid = camId.value.trim() || "cam01";
         await post(`${BACKEND}/stream/stop?camera_id=${encodeURIComponent(cid)}`);
         setRunning(false);
-        msg.textContent = "Stream flag set to STOPPED";
+        msg.textContent = "Stream stopped";
       }catch(e){
         msg.textContent = "Failed to stop stream.";
       }
@@ -149,13 +135,12 @@
     startBtn.addEventListener("click", handleStart);
     stopBtn.addEventListener("click", handleStop);
 
-    [camId, source, fps, conf].forEach(el => {
+    [camId, source].forEach(el=>{
       el.addEventListener("change", ()=>{
         if(running){ img.src = streamUrl(); }
       });
     });
 
-    // Init
     setRunning(false);
   </script>
 </body>
