@@ -393,3 +393,40 @@ html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:
   .hero-right{display:flex;justify-content:center}
   .cards-grid{grid-template-columns:1fr}
 }
+
+/* Event details */
+/* >>collapsible cards */
+.panel { 
+  border:1px solid var(--border); 
+  border-radius: var(--radius); 
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+  margin: 14px 0; 
+  box-shadow: var(--shadow);
+  overflow:hidden;
+}
+.panel > summary{
+  list-style:none; cursor:pointer; padding:14px 16px; 
+  font-weight:900; display:flex; align-items:center; gap:.6rem;
+  border-bottom:1px solid var(--border);
+}
+.panel > summary::-webkit-details-marker{ display:none }
+.panel .panel-body{ padding: 14px 16px; }
+
+/*color variants, little different */
+.panel--teal   > summary { background: rgba(0,77,97,.12); }
+.panel--ruby   > summary { background: rgba(130,38,89,.10); }
+.panel--slate  > summary { background: rgba(255,255,255,.04); }
+
+.kvlist{ 
+  display:grid; grid-template-columns: 180px 1fr; 
+  gap:.55rem 1.2rem; 
+}
+.kvlist dt{ font-weight:800; opacity:.85; }
+.kvlist dd{ margin:0; opacity:.95; }
+
+.pill-mini {
+  display:inline-flex; align-items:center; gap:.5rem;
+  padding:.35rem .6rem; border-radius:999px;
+  border:1px solid var(--border); background: var(--surface-2);
+  font-weight:800; font-size:.9rem;
+}

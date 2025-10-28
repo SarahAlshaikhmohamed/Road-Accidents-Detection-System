@@ -552,6 +552,20 @@ def list_events(limit: int = Query(50, ge=1, le=500)):
         rows = conn.execute(stmt, {"limit": limit}).mappings().all()
     return {"events": [dict(r) for r in rows]}
 
+@app.get("/events/{event_id}")
+def get_event_meta(event_id: str):
+    stmt = text("""
+        SELECT event_id, camera_id, time_utc, mean_conf, thumbnail_url
+        FROM public.incidents
+        WHERE event_id = :event_id
+        LIMIT 1
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(stmt, {"event_id": event_id}).mappings().first()
+    if not row:
+        return JSONResponse(status_code=404, content={"detail": "Event not found"})
+    return dict(row)
+
 @app.get("/potholes")
 def list_potholes(limit: int = Query(50, ge=1, le=500)):
     stmt = text("""
@@ -591,6 +605,18 @@ def get_event_report(event_id: str):
         parsed = {"raw_report": raw}
 
     return {"event_id": row["event_id"], "report": parsed}
+
+@app.get("/potholes/{event_id}")
+def get_pothole_meta(event_id: str):
+    stmt = text("""
+        SELECT event_id, camera_id, time_utc, size, thumbnail_url, bbox_xyxy
+        FROM public.potholes WHERE event_id = :event_id LIMIT 1
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(stmt, {"event_id": event_id}).mappings().first()
+    if not row:
+        return JSONResponse(status_code=404, content={"detail": "Pothole not found"})
+    return dict(row)
 
 # --------------------------------------------------------------
 # RAG
@@ -876,3 +902,13 @@ def partial_potholes(request: Request, limit: int = 24):
     with engine.connect() as conn:
         rows = conn.execute(stmt, {"limit": limit}).mappings().all()
     return templates.TemplateResponse("_events.html", {"request": request, "potholes": rows})
+
+@app.get("/ui/event", response_class=HTMLResponse)
+def ui_event_details(request: Request):
+    # eventId is taken on the client via ?id=...
+    return templates.TemplateResponse("event_details.html", {"request": request})
+
+# UI route
+@app.get("/ui/pothole", response_class=HTMLResponse)
+def ui_pothole_details(request: Request):
+    return templates.TemplateResponse("pothole_details.html", {"request": request})
