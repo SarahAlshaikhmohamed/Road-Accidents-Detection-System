@@ -169,8 +169,6 @@ Detections are automatically submitted to the system and stored.
 
 Our BUAD | بُعد system successfully detects road accidents and potholes in real time using Raspberry Pi cameras integrated with AI models. 
 
-###  Key Results
-
 -   *Accident Detection*
   - High detection accuracy on live video streams
   - False alarms reduced using voting logic + VLM validation
@@ -201,7 +199,9 @@ Our BUAD | بُعد system successfully detects road accidents and potholes in r
 ## Recommendations & Future Work
 - Deploy the system in real environments.
 - Expand data and analytics features.
+- Train pothole model on richer dataset.
 - Move toward an integrated, smart city management platform.
+
 ---
 
 ## Contributors
@@ -216,7 +216,7 @@ Our BUAD | بُعد system successfully detects road accidents and potholes in r
 
 ## Presentation
 
-[Project Demo]()
+[Project Demo](https://drive.google.com/drive/folders/1rGE39RDCr-Sov52OHaQ41kee8__eGXeD?usp=drive_link)
 
 ---
 
