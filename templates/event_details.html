@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buad | Event Details</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <header class="site-header">
+    <nav class="container flex-between">
+      <a href="/" class="brand">Buad</a>
+      <ul class="nav">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/ui/live">Live</a></li>
+        <li><a class="active" href="/ui/dashboard">Dashboard</a></li>
+        <li><a href="/ui/chat">Chatbot</a></li>
+      </ul>
+      <a class="icon-btn" href="/ui/dashboard" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    </nav>
+  </header>
+
+  <section class="hero container">
+    <div>
+      <h1>Event details</h1>
+      <p class="small">Structured VLM JSON report with thumbnail and metadata.</p>
+    </div>
+  </section>
+
+  <section class="section container" id="content">
+    <div class="image-shell">
+      <span id="ribbon" class="ribbon">Severity</span>
+      <img id="thumb" class="thumb" alt="thumbnail" src="">
+    </div>
+
+    <!-- Overview -->
+    <details class="panel panel--teal" open>
+      <summary>Overview</summary>
+      <div class="panel-body">
+        <dl id="kv-over" class="kvlist"></dl>
+      </div>
+    </details>
+
+    <!-- Scene -->
+    <details class="panel panel--ruby" open>
+      <summary>Scene</summary>
+      <div class="panel-body">
+        <dl id="kv-scene" class="kvlist"></dl>
+      </div>
+    </details>
+
+    <!-- Traffic -->
+    <details class="panel panel--slate" open>
+      <summary>Traffic</summary>
+      <div class="panel-body">
+        <dl id="kv-traffic" class="kvlist"></dl>
+      </div>
+    </details>
+
+    <!-- Evidence -->
+    <details class="panel">
+      <summary>Evidence</summary>
+      <div class="panel-body">
+        <div id="ev-list" class="small note">No evidence items.</div>
+      </div>
+    </details>
+
+    <!-- Confidence (collapsed by default) -->
+    <details class="panel" id="conf-panel">
+      <summary>Confidence</summary>
+      <div class="panel-body">
+        <dl id="kv-conf" class="kvlist"></dl>
+      </div>
+    </details>
+
+    <div class="tabs">
+      <a id="rawLink" class="btn" target="_blank" rel="noopener">Open raw JSON</a>
+      <a id="dlLink" class="btn btn-ghost" download>Download report</a>
+      <a id="imgLink" class="btn btn-ghost" target="_blank" rel="noopener">Open image</a>
+    </div>
+  </section>
+
+  <div class="footer-gap"></div>
+
+  <script>
+    "use strict";
+
+    const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
+    const params = new URLSearchParams(location.search);
+    const eventId = params.get("id");
+
+    const SEV_COLORS = { Low:"#facc15", Medium:"#fb923c", High:"#ef4444", Unknown:"#9ca3af" };
+    const BLUE_FALSE = "#3b82f6";
+
+    const el = id => document.getElementById(id);
+    function addRow(list, k, v){
+      const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.textContent = (v ?? "-");
+      list.appendChild(dt); list.appendChild(dd);
+    }
+    async function j(url){ const r = await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+    const isFalseAlarm = contact => ["No-contact","Unknown"].includes(String(contact||"").trim());
+
+    function formatUTCtoLocal(iso, tz="Asia/Riyadh"){
+      if(!iso) return "-";
+      try{
+        const d = new Date(iso);
+        return new Intl.DateTimeFormat('en-GB',{ 
+          timeZone: tz, year:'numeric', month:'2-digit', day:'2-digit',
+          hour:'2-digit', minute:'2-digit', second:'2-digit'
+        }).format(d) + " KSA";
+      }catch{ return iso; }
+    }
+
+    async function boot(){
+      if(!eventId){ el("content").innerHTML = "<div class='small'>Missing event id.</div>"; return; }
+
+      // meta
+      const meta = await j(`${BACKEND}/events/${encodeURIComponent(eventId)}`).catch(()=>({}));
+
+      // report
+      const repPayload = await j(`${BACKEND}/events/${eventId}/report`);
+      const rep = repPayload.report || {};
+
+      // thumbnail + actions
+      el("thumb").src = meta.thumbnail_url || "";
+      el("imgLink").href = meta.thumbnail_url || "#";
+      el("rawLink").href = `${BACKEND}/events/${eventId}/report`;
+      el("dlLink").href  = `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(rep,null,2))}`;
+      el("dlLink").download = `${eventId}_report.json`;
+
+      // ribbon
+      const sev = rep.Severity || "Unknown";
+      const contact = rep.Contact_level || "Unknown";
+      const fa = isFalseAlarm(contact);
+      const rib = el("ribbon");
+      rib.textContent = fa ? "False Alarm" : `Severity: ${sev}`;
+      rib.style.background = fa ? BLUE_FALSE : (SEV_COLORS[sev] || SEV_COLORS.Unknown);
+
+      // lists
+      const over = el("kv-over");
+      const scene = el("kv-scene");
+      const traf  = el("kv-traffic");
+      const conf  = el("kv-conf");
+
+      addRow(over, "Event ID", eventId);
+      addRow(over, "Camera", meta.camera_id || "-");
+      addRow(over, "UTC Time", meta.time_utc || "-");
+      addRow(over, "Local Time", formatUTCtoLocal(meta.time_utc));
+      addRow(over, "Category", rep.Category);
+      addRow(over, "Severity", sev);
+      addRow(over, "Contact level", contact);
+      addRow(over, "Vehicles count", rep.Vehicles_count);
+      if (typeof meta.mean_conf === "number") addRow(over, "Mean confidence", meta.mean_conf.toFixed(2));
+
+      addRow(scene, "Environment", rep.Environment);
+      addRow(scene, "Weather", rep.Weather);
+      addRow(scene, "Time of day", rep.Time);
+      addRow(scene, "Derivation object", rep.Derivation_object);
+
+      addRow(traf, "Traffic lane", rep.Traffic_lane_of_the_object);
+      addRow(traf, "Emergency lights", rep.Emergency_lights);
+
+      // evidence
+      const ev = rep.Evidence || [];
+      const evBox = el("ev-list");
+      evBox.innerHTML = ev.length ? ("<ul>"+ev.map(x=>`<li>${String(x)}</li>`).join("")+"</ul>") : "No evidence items.";
+
+      // confidence (collapsed if empty)
+      const c = rep.Confidence || {};
+      if(Object.keys(c).length){
+        Object.entries(c).forEach(([k,v])=> addRow(conf, k, v));
+      }else{
+        document.getElementById("conf-panel").open = false;
+        conf.innerHTML = "<div class='small'>No confidence scores.</div>";
+      }
+    }
+    boot();
+  </script>
+</body>
+</html>

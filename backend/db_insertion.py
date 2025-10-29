@@ -4,18 +4,6 @@ import json
 from sqlalchemy import text
 
 
-def normalize_vlm_result(vlm_result):
-    if isinstance(vlm_result, str):
-        try:
-            return json.loads(vlm_result)
-        except Exception:
-            return {"error": "VLM returned non-JSON", "raw": vlm_result[:800]}
-    if vlm_result is None:
-        return {}
-    if isinstance(vlm_result, dict):
-        return vlm_result
-    return {"error": "invalid_vlm_result_type", "type": str(type(vlm_result))}
-
 # >> insert accident row into public.incidents
 async def db_insert_accident( engine, knowledge, *,
     event_id: str,
@@ -24,11 +12,12 @@ async def db_insert_accident( engine, knowledge, *,
     public_url: str,
     image_uuid: str,
     bbox_xyxy=None,
+    mean_conf = None,
     latitude=None,
     longitude=None,
     vlm_result: dict | None = None,   #
 ):
-    vlm_result = normalize_vlm_result(vlm_result)
+    
     # >> confidences 
     conf = vlm_result.get("Confidence", {}) or {}
 
@@ -45,7 +34,7 @@ async def db_insert_accident( engine, knowledge, *,
         "camera_id": camera_id,
         "time_utc": time_utc,
         "bbox_xyxy": bbox_xyxy,
-        "mean_conf": None, 
+        "mean_conf": mean_conf, 
         "thumbnail_url": public_url,
         "image_id": image_uuid,
         "latitude": latitude,
@@ -104,10 +93,10 @@ async def db_insert_accident( engine, knowledge, *,
         inserted_id = res.scalar()
 
     # >> Accident_reports
-    # >> optional: add to vector DB 
     try:
-        if knowledge is not None and vlm_result is not None:
-            text_content = json.dumps(vlm_result, ensure_ascii=False).replace('"', '')
+        #if knowledge is not None and vlm_result is not None:
+            #text_content = json.dumps(vlm_result, ensure_ascii=False).replace('"', '')
+            text_content = json.dumps(vlm_result).replace('"', '') 
             metadata = {"image_id": image_uuid, "event_id": event_id, "camera_id": camera_id}
             await knowledge.add_content_async(text_content=text_content, metadata=metadata)
     except Exception as e:
@@ -123,6 +112,7 @@ async def db_insert_pothole(engine, knowledge_pothole,*,
     public_url: str,
     image_uuid: str,
     bbox_xyxy=None,
+    mean_conf = None,
     latitude=None,
     longitude=None,
     size: str | None = None,
@@ -133,7 +123,7 @@ async def db_insert_pothole(engine, knowledge_pothole,*,
         "camera_id": camera_id,
         "time_utc": time_utc,
         "bbox_xyxy": bbox_xyxy,
-        "mean_conf": None,
+        "mean_conf": mean_conf,
         "thumbnail_url": public_url,
         "image_id": image_uuid,
         "latitude": latitude,
@@ -159,10 +149,9 @@ async def db_insert_pothole(engine, knowledge_pothole,*,
         conn.commit()
         inserted_id = res.scalar()
 
-    # >> Pothole report
-    # >> optional: add to vector DB  
+    # >> Pothole report 
     try:
-        if knowledge_pothole is not None:
+        #if knowledge_pothole is not None:
             pothole_result = {
                 "size": size,
                 "latitude": latitude,

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buad | Pothole Details</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <header class="site-header">
+    <nav class="container flex-between">
+      <a href="/" class="brand">Buad</a>
+      <ul class="nav">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/ui/live">Live</a></li>
+        <li><a class="active" href="/ui/dashboard">Dashboard</a></li>
+        <li><a href="/ui/chat">Chatbot</a></li>
+      </ul>
+      <a class="icon-btn" href="/ui/dashboard" title="Back"><i class="fa-solid fa-arrow-left"></i></a>
+    </nav>
+  </header>
+
+  <section class="hero container">
+    <div>
+      <h1>Pothole details</h1>
+      <p class="small">Detected pothole with basic metadata and thumbnail.</p>
+    </div>
+  </section>
+
+  <section class="section container" id="content">
+    <div class="image-shell">
+      <span class="ribbon" style="background:#9ca3af">Pothole</span>
+      <img id="thumb" class="thumb" alt="thumbnail" src="">
+    </div>
+
+    <details class="panel panel--teal" open>
+      <summary>Overview</summary>
+      <div class="panel-body">
+        <dl id="kv-over" class="kvlist"></dl>
+      </div>
+    </details>
+
+    <div class="tabs">
+      <a id="imgLink" class="btn btn-ghost" target="_blank" rel="noopener">Open image</a>
+    </div>
+  </section>
+
+  <div class="footer-gap"></div>
+
+  <script>
+    "use strict";
+    const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
+    const params = new URLSearchParams(location.search);
+    const eventId = params.get("id");
+
+    const el = id => document.getElementById(id);
+    function addRow(list,k,v){ const dt=document.createElement("dt");dt.textContent=k; const dd=document.createElement("dd");dd.textContent=v??"-"; list.appendChild(dt); list.appendChild(dd); }
+    function formatUTCtoLocal(iso, tz="Asia/Riyadh"){
+      if(!iso) return "-";
+      try{
+        const d = new Date(iso);
+        return new Intl.DateTimeFormat('en-GB',{ timeZone: tz, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }).format(d) + " KSA";
+      }catch{ return iso; }
+    }
+    async function j(u){ const r=await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+    async function boot(){
+      if(!eventId){ el("content").innerHTML = "<div class='small'>Missing event id.</div>"; return; }
+
+      // fetch meta from DB
+      const metaList = await j(`${BACKEND}/potholes?limit=200`);
+      const meta = (metaList.potholes || []).find(p => p.event_id === eventId) || {};
+
+      el("thumb").src = meta.thumbnail_url || "";
+      el("imgLink").href = meta.thumbnail_url || "#";
+
+      const over = el("kv-over");
+      addRow(over, "Event ID", meta.event_id || eventId);
+      addRow(over, "UTC Time", meta.time_utc || "-");
+      addRow(over, "Local Time", formatUTCtoLocal(meta.time_utc));
+
+      if (meta.size) addRow(over, "Estimated size", meta.size);
+      if (Array.isArray(meta.bbox_xyxy)) addRow(over, "BBox [x1,y1,x2,y2]", meta.bbox_xyxy.join(", "));
+    }
+    boot();
+  </script>
+</body>
+</html>

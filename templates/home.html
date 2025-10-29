@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Buad — Smart Road Monitoring</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <!-- Lottie -->
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+</head>
+<body class="buad-body">
+
+  <!-- Top Nav -->
+  <header class="nav-shell">
+    <div class="nav-wrap">
+      <a class="brand" href="#hero">Buad | بُـعـد</a>
+      <nav class="nav-links">
+        <a href="#hero">Home</a>
+        <a href="/ui/dashboard">Dashboard</a>
+        <a href="/ui/chat">Chatbot</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section id="hero" class="hero">
+    <div class="hero-bg-grad"></div>
+    <div class="container hero-grid">
+      <div class="hero-left">
+        <h1 class="hero-title">Welcome to Buad</h1>
+        <p class="hero-sub">
+          A smart real time road monitoring system that identifies accidents through live camera feed
+          and sends instant reports.
+        </p>
+
+        <div class="hero-cta">
+          <a class="btn btn-cta" href="/ui/dashboard">Dashboard</a>
+        </div>
+      </div>
+
+      <div class="hero-right">
+        <lottie-player
+          src="https://lottie.host/1b2e4c72-87cf-4cdf-a027-131ee5d00b55/1aw3EuQKSP.json"
+          background="transparent" speed="1" loop autoplay
+          style="width: 520px; height: 520px">
+        </lottie-player>
+      </div>
+    </div>
+  </section>
+  </section>
+  <!-- Features -->
+  <section id="features" class="section">
+    <div class="container">
+      <h2 class="section-title">Buad Features</h2>
+      <!-- <p class="section-sub">Everything you need to monitor, review, and query incidents</p> -->
+
+      <div class="cards-grid">
+
+        <!-- the live detection -->
+        <article class="card">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M8 5v14l11-7-11-7z" fill="currentColor"></path>
+            </svg>
+          </div>
+          <h3 class="card-title">Accident & Pothole detection in real-time.</h3>
+        </article>
+
+        <!-- dashboard -->
+        <article class="card">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3 class="card-title">Smart Confirmation to avoid repeated false event.</h3>
+        </article>
+
+        <!-- Chatbot -->
+        <article class="card">
+          <div class="card-icon">
+            <!-- chat icon -->
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 4h16v11H7l-3 3V4z" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3 class="card-title">Scene understanding using Vision Language Model.</h3>
+        </article>
+
+        <!-- Chatbot -->
+        <article class="card">
+          <div class="card-icon">
+            <!-- chat icon -->
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 4h16v11H7l-3 3V4z" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3 class="card-title">Dashboard with metadata view.</h3>
+        </article>
+
+        <!-- Chatbot -->
+        <article class="card">
+          <div class="card-icon">
+            <!-- chat icon -->
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 4h16v11H7l-3 3V4z" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3 class="card-title">RAG chatbot using embedded inceident recoreds.</h3>
+        </article>
+
+        <!-- Chatbot -->
+        <article class="card">
+          <div class="card-icon">
+            <!-- chat icon -->
+            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+              <path d="M4 4h16v11H7l-3 3V4z" fill="currentColor"/>
+            </svg>
+          </div>
+          <h3 class="card-title">Audio query support in both Arabic and English.</h3>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Resources like GitHub and others -->
+  <section id="resources" class="section section-tight">
+    <div class="container">
+      <h2 class="section-title">Resources</h2>
+      <div class="cards-grid resources-grid">
+        <article class="card card-plain">
+          <h3 class="card-title">GitHub</h3>
+          <div class="card-actions">
+            <a class="btn btn-cta" href="https://github.com/SarahAlshaikhmohamed/Road-Accidents-Detection-System" target="_blank" rel="noopener">
+              Open Project Repository
+            </a>
+          </div>
+        </article>
+
+        <article class="card card-plain">
+          <h3 class="card-title">Team Members</h3>
+          <div class="card-actions">
+            <a class="btn btn-cta" href="https://linktr.ee/Buad25" target="_blank" rel="noopener">
+              Contact Team Members
+            </a>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container foot-wrap">
+      <div>© 2025 Buad</div>
+      <div class="muted">Built with FastAPI & HTMX UI</div>
+    </div>
+  </footer>
+
+  <script>
+    const sections = ["hero","about","features","resources"].map(id => document.getElementById(id));
+    const links = [...document.querySelectorAll(".nav-links a")];
+    const spy = () => {
+      let y = window.scrollY + 120;
+      let current = sections.findLast(s => s.offsetTop <= y) || sections[0];
+      links.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#" + current.id));
+    };
+    document.addEventListener("scroll", spy, {passive:true});
+    spy();
+  </script>
+</body>
+</html>

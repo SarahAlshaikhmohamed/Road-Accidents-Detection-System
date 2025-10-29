@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Buad | RAG Chat</title>
+
+  <link rel="stylesheet" href="/static/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <header class="site-header">
+    <nav class="container flex-between">
+      <a href="/" class="brand">Buad</a>
+      <ul class="nav">
+        <li><a href="/home">Home</a></li>
+        <li><a href="/ui/live">Live</a></li>
+        <li><a href="/ui/dashboard">Dashboard</a></li>
+        <li><a class="active" href="/ui/chat">Chatbot</a></li>
+      </ul>
+      <button class="icon-btn" title="Dark theme only"><i class="fa-solid fa-moon"></i></button>
+    </nav>
+  </header>
+
+  <main class="chat-wrap">
+    <section class="chat-hero">
+      <h1>Buad RAG Assistant</h1>
+      <p class="subtle">Ask about accident reports, pothole reports, or accident statistics. Use text or voice.</p>
+
+      <div class="mode-row">
+        <button id="modeText" class="btn-chip active"><i class="fa-solid fa-keyboard"></i> Text</button>
+        <button id="modeVoice" class="btn-chip"><i class="fa-solid fa-microphone"></i> Voice</button>
+        <!--<span id="healthPill" class="health-pill" title="Backend health">Checking API…</span> -->
+      </div>
+
+      <div class="prompt-examples">
+        <span class="ex" data-q="Tell me about recent accidents.">Recent accidents</span>
+        <span class="ex" data-q="Show the latest pothole reports.">What are the pothole reports?</span>
+        <span class="ex" data-q="Show me accident statistics">Show me accident statistics</span>
+      </div>
+    </section>
+
+    <!-- Chat -->
+    <section class="chat-card">
+      <div id="bubbles" class="bubbles" aria-live="polite"></div>
+
+      <!-- Text input bar -->
+      <div id="textBar" class="input-bar">
+        <input id="textInput" type="text" placeholder="Type your question and press Enter..."/>
+        <button id="sendBtn" class="btn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        <button id="clearBtn" class="btn-ghost">Clear</button>
+      </div>
+
+      <!-- Voice recorder bar -->
+      <div id="voiceBar" class="input-bar" style="display:none">
+        <button id="recBtn" class="recorder">
+          <i id="recIcon" class="fa-solid fa-microphone"></i>
+          <span id="recLabel">Record</span>
+        </button>
+        <audio id="userAudio" controls style="margin-left:.5rem; display:none"></audio>
+        <audio id="replyAudio" controls style="margin-left:auto; display:none"></audio>
+        <button id="clearBtn2" class="btn-ghost">Clear</button>
+      </div>
+    </section>
+
+    <div style="height:24px"></div>
+  </main>
+
+  <script>
+    "use strict";
+
+    /* Config */
+    const BACKEND = (window.CONFIG && window.CONFIG.BACKEND) || "http://localhost:8000";
+    const TEXT_API_URL  = BACKEND + "/chat";
+    const AUDIO_API_URL = BACKEND + "/audio-chat";
+    const HEALTH_URL    = BACKEND + "/health";
+
+    /* Elements */
+    const bubbles    = document.getElementById("bubbles");
+    const textBar    = document.getElementById("textBar");
+    const voiceBar   = document.getElementById("voiceBar");
+    const modeText   = document.getElementById("modeText");
+    const modeVoice  = document.getElementById("modeVoice");
+    const healthPill = document.getElementById("healthPill");
+
+    const textInput  = document.getElementById("textInput");
+    const sendBtn    = document.getElementById("sendBtn");
+    const clearBtn   = document.getElementById("clearBtn");
+    const clearBtn2  = document.getElementById("clearBtn2");
+
+    const recBtn     = document.getElementById("recBtn");
+    const recIcon    = document.getElementById("recIcon");
+    const recLabel   = document.getElementById("recLabel");
+    const userAudio  = document.getElementById("userAudio");
+    const replyAudio = document.getElementById("replyAudio");
+
+    /* Example prompts */
+    document.querySelectorAll(".ex").forEach(x => {
+      x.addEventListener("click", () => {
+        const q = x.getAttribute("data-q") || "";
+        if (!q) return;
+        textInput.value = q;
+        textInput.focus();
+      });
+    });
+
+    (async function health(){
+      try{
+        const r = await fetch(HEALTH_URL, { cache: "no-store" });
+        if (!r.ok) throw 0;
+        await r.json().catch(()=>({}));
+        healthPill.textContent = "API Connected";
+        healthPill.style.borderColor = "#3E5641";
+        healthPill.style.background  = "#3E5641";
+        healthPill.style.color       = "#F0F0F0";
+      }catch(e){
+        healthPill.textContent = "API Unavailable";
+        healthPill.style.borderColor = "#822659";
+        healthPill.style.background  = "#822659";
+        healthPill.style.color       = "#F0F0F0";
+      }
+    })();
+
+    /* mode switch */
+    modeText.addEventListener("click", () => {
+      modeText.classList.add("active");
+      modeVoice.classList.remove("active");
+      textBar.style.display = "";
+      voiceBar.style.display = "none";
+      textInput.focus();
+    });
+    modeVoice.addEventListener("click", () => {
+      modeVoice.classList.add("active");
+      modeText.classList.remove("active");
+      textBar.style.display = "none";
+      voiceBar.style.display = "";
+    });
+
+    /* UI */
+    function bubble(role, content){
+      const div = document.createElement("div");
+      div.className = "bubble " + (role === "user" ? "user" : "assistant");
+      div.textContent = content;
+      bubbles.appendChild(div);
+      bubbles.scrollTop = bubbles.scrollHeight;
+    }
+
+    /* Text chat */
+    async function sendText(){
+      const msg = (textInput.value || "").trim();
+      if (!msg) return;
+      bubble("user", msg);
+      textInput.value = "";
+
+      const ghost = document.createElement("div");
+      ghost.className = "bubble assistant";
+      ghost.textContent = "Thinking...";
+      bubbles.appendChild(ghost);
+      bubbles.scrollTop = bubbles.scrollHeight;
+
+      try{
+        const r = await fetch(TEXT_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg })
+        });
+        if (!r.ok){
+          ghost.textContent = "Error: " + r.status;
+          return;
+        }
+        const data = await r.json();
+        ghost.textContent = (data && data.success) ? (data.response || "") :
+                            (data && data.response) ? String(data.response) : "No response.";
+      }catch(e){
+        ghost.textContent = "Connection error. Make sure backend is running.";
+      }
+    }
+
+    sendBtn.addEventListener("click", sendText);
+    textInput.addEventListener("keydown", (e)=>{ if (e.key === "Enter") sendText(); });
+    clearBtn.addEventListener("click", ()=>{ bubbles.innerHTML = ""; });
+
+    /* Voice chat */
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let chunks = [];
+    let recording = false;
+
+    recBtn.addEventListener("click", toggleRecord);
+    clearBtn2.addEventListener("click", ()=>{
+      bubbles.innerHTML = ""; 
+      [userAudio, replyAudio].forEach(a => { a.style.display="none"; a.removeAttribute("src"); });
+    });
+
+    async function toggleRecord(){
+      if (!recording){
+        try{
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : undefined;
+          mediaRecorder = new MediaRecorder(mediaStream, mime ? { mimeType: mime } : undefined);
+        }catch(e){
+          alert("Microphone permission needed.");
+          return;
+        }
+        chunks = [];
+        mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          try{
+            const webmBlob = new Blob(chunks, { type: "audio/webm" });
+            const wavBlob = await webmToWav(webmBlob);
+            // playback 
+            const userUrl = URL.createObjectURL(wavBlob);
+            userAudio.src = userUrl;
+            userAudio.style.display = "";
+            userAudio.play().catch(()=>{});
+            //  to backend
+            await sendWavToBackend(wavBlob);
+          }catch(err){
+            console.error(err);
+            bubble("assistant", "Audio processing failed.");
+          }finally{
+            stopStream();
+          }
+        };
+        mediaRecorder.start();
+        recording = true;
+        recIcon.className = "fa-solid fa-stop";
+        recLabel.textContent = "Stop";
+      }else{
+        mediaRecorder && mediaRecorder.stop();
+        recording = false;
+        recIcon.className = "fa-solid fa-microphone";
+        recLabel.textContent = "Record";
+      }
+    }
+
+    function stopStream(){
+      if (mediaStream){
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+    }
+
+    async function sendWavToBackend(wavBlob){
+      bubble("user", "[Voice message]");
+      const ghost = document.createElement("div");
+      ghost.className = "bubble assistant";
+      ghost.textContent = "Processing audio...";
+      bubbles.appendChild(ghost);
+      bubbles.scrollTop = bubbles.scrollHeight;
+
+      const form = new FormData();
+      form.append("audio_file", wavBlob, "recording.wav"); // match FastAPI expectation
+
+      try{
+        const r = await fetch(AUDIO_API_URL, { method: "POST", body: form });
+        if (!r.ok){
+          ghost.textContent = "Error: " + r.status;
+          return;
+        }
+        const buf = await r.arrayBuffer();
+        if (!buf || buf.byteLength === 0){
+          ghost.textContent = "Empty audio response.";
+          return;
+        }
+        const wav = new Blob([buf], { type: "audio/wav" });
+        const url = URL.createObjectURL(wav);
+        replyAudio.style.display = "";
+        replyAudio.src = url;
+        ghost.textContent = "[Audio reply ready]";
+        replyAudio.play().catch(()=>{});
+      }catch(e){
+        ghost.textContent = "Connection error. Make sure backend is running.";
+      }
+    }
+
+    async function webmToWav(webmBlob){
+      const arrayBuf = await blobToArrayBuffer(webmBlob);
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+
+      const numChannels = audioBuf.numberOfChannels;
+      const sampleRate  = audioBuf.sampleRate;
+      const length      = audioBuf.length;
+
+      // gather channel data
+      const channels = [];
+      for (let c = 0; c < numChannels; c++){
+        channels.push(audioBuf.getChannelData(c));
+      }
+
+      const wavBytes = encodeWavPCM16(channels, sampleRate);
+      return new Blob([wavBytes], { type: "audio/wav" });
+    }
+
+    function blobToArrayBuffer(blob){
+      return new Promise((resolve, reject)=>{
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = reject;
+        fr.readAsArrayBuffer(blob);
+      });
+    }
+
+    function encodeWavPCM16(channels, sampleRate){
+      const numChannels = channels.length;
+      const length = channels[0].length;
+
+      const interleaved = new Float32Array(length * numChannels);
+      for (let i = 0; i < length; i++){
+        for (let ch = 0; ch < numChannels; ch++){
+          interleaved[i * numChannels + ch] = channels[ch][i];
+        }
+      }
+      const pcm16 = floatTo16BitPCM(interleaved);
+      return buildWavFile(pcm16, sampleRate, numChannels);
+    }
+
+    function floatTo16BitPCM(float32){
+      const out = new DataView(new ArrayBuffer(float32.length * 2));
+      let offset = 0;
+      for (let i = 0; i < float32.length; i++, offset += 2){
+        let s = Math.max(-1, Math.min(1, float32[i]));
+        out.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return out;
+    }
+
+    function buildWavFile(pcm16DataView, sampleRate, numChannels){
+      const bytesPerSample = 2;
+      const blockAlign = numChannels * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const dataSize = pcm16DataView.byteLength;
+
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      writeString(view, 0, "RIFF");
+      view.setUint32(4, 36 + dataSize, true);
+      writeString(view, 8, "WAVE");
+
+      // fmt chunk
+      writeString(view, 12, "fmt ");
+      view.setUint32(16, 16, true);     
+      view.setUint16(20, 1, true);      
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);     
+
+      // data chunk
+      writeString(view, 36, "data");
+      view.setUint32(40, dataSize, true);
+
+      // copy PCM
+      const pcmBytes = new Uint8Array(pcm16DataView.buffer);
+      new Uint8Array(buffer, 44).set(pcmBytes);
+
+      return buffer;
+    }
+
+    function writeString(view, offset, str){
+      for (let i = 0; i < str.length; i++){
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    }
+  </script>
+</body>
+</html>
