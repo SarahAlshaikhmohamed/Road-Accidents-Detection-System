@@ -81,7 +81,6 @@
       addRow(over, "UTC Time", meta.time_utc || "-");
       addRow(over, "Local Time", formatUTCtoLocal(meta.time_utc));
 
-      // Optional extras if present
       if (meta.size) addRow(over, "Estimated size", meta.size);
       if (Array.isArray(meta.bbox_xyxy)) addRow(over, "BBox [x1,y1,x2,y2]", meta.bbox_xyxy.join(", "));
     }
