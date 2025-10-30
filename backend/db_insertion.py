@@ -1,8 +1,32 @@
 # DB INSERT
 
-import json
+import json, os
 from sqlalchemy import text
+from agno.knowledge.knowledge import Knowledge
+from agno.vectordb.pgvector import PgVector, SearchType
+from agno.knowledge.embedder.openai import OpenAIEmbedder
 
+embedder = OpenAIEmbedder()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+knowledge_Accident = Knowledge(
+        vector_db=PgVector(
+            table_name="Accident_reports",
+            db_url=DATABASE_URL,
+            embedder=embedder,
+            search_type=SearchType.hybrid
+        ),
+    )
+
+knowledge_Pothole = Knowledge(
+    vector_db=PgVector(
+        table_name="Pothole_report",
+        db_url=DATABASE_URL,  
+        embedder=embedder,
+        search_type=SearchType.hybrid,
+    ),
+)
 
 # >> insert accident row into public.incidents
 async def db_insert_accident( engine, knowledge, *,
@@ -17,6 +41,7 @@ async def db_insert_accident( engine, knowledge, *,
     longitude=None,
     vlm_result: dict | None = None,   #
 ):
+    
     
     # >> confidences 
     conf = vlm_result.get("Confidence", {}) or {}
@@ -93,14 +118,15 @@ async def db_insert_accident( engine, knowledge, *,
         inserted_id = res.scalar()
 
     # >> Accident_reports
-    try:
-        #if knowledge is not None and vlm_result is not None:
-            #text_content = json.dumps(vlm_result, ensure_ascii=False).replace('"', '')
-            text_content = json.dumps(vlm_result).replace('"', '') 
-            metadata = {"image_id": image_uuid, "event_id": event_id, "camera_id": camera_id}
-            await knowledge.add_content_async(text_content=text_content, metadata=metadata)
-    except Exception as e:
-        print("Warning: vector DB insert failed:", e)
+    text_content = json.dumps(vlm_result).replace('"', '')
+    content = f"latitude:{latitude} ,longitude:{longitude}  ,time_utc:{time_utc},content:{ text_content}  "
+    metadata = {"image_id": image_uuid, "event_id": event_id, "camera_id": camera_id}
+
+    await knowledge_Accident.add_content_async(
+                text_content=content,
+                metadata=metadata,
+                name=image_uuid
+                )
 
     return inserted_id
 
@@ -118,6 +144,7 @@ async def db_insert_pothole(engine, knowledge_pothole,*,
     size: str | None = None,
     notes: str | None = None,
 ):
+    
     params = {
         "event_id": event_id,
         "camera_id": camera_id,
@@ -162,7 +189,12 @@ async def db_insert_pothole(engine, knowledge_pothole,*,
             }
             text_content = json.dumps(pothole_result, ensure_ascii=False).replace('"', '')
             metadata = {"image_id": image_uuid, "event_id": event_id, "camera_id": camera_id}
-            await knowledge_pothole.add_content_async(text_content=text_content, metadata=metadata, name=image_uuid)
+
+            await knowledge_Pothole.add_content_async(
+                        text_content=text_content,
+                        metadata=metadata,
+                        name=image_uuid
+                        )
     except Exception as e:
         print("Warning: vector DB insert failed (pothole):", e)
 

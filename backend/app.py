@@ -454,6 +454,8 @@ def stream_status(camera_id: str = Query("cam01")):
 # >> stream generator (reads frames, runs model, draws boxes)
 def _stream_generator(src: str, conf_acc: float, conf_pot: float, max_fps: int, camera_id: str):
     cap = cv2.VideoCapture(int(src)) if src.isdigit() else cv2.VideoCapture(src)
+    #cv
+
     if not cap.isOpened():
         yield b""  # if cannot open source
         return
@@ -543,7 +545,9 @@ def list_events(limit: int = Query(50, ge=1, le=500)):
             camera_id,
             time_utc,
             mean_conf,
-            thumbnail_url
+            thumbnail_url,
+            latitude,
+            longitude
         FROM public.incidents
         ORDER BY time_utc DESC
         LIMIT :limit
@@ -555,7 +559,14 @@ def list_events(limit: int = Query(50, ge=1, le=500)):
 @app.get("/events/{event_id}")
 def get_event_meta(event_id: str):
     stmt = text("""
-        SELECT event_id, camera_id, time_utc, mean_conf, thumbnail_url
+        SELECT 
+                event_id, 
+                camera_id, 
+                time_utc, 
+                mean_conf, 
+                thumbnail_url, 
+                latitude,
+                longitude
         FROM public.incidents
         WHERE event_id = :event_id
         LIMIT 1
@@ -575,7 +586,9 @@ def list_potholes(limit: int = Query(50, ge=1, le=500)):
             time_utc,
             size,
             thumbnail_url,
-            bbox_xyxy
+            bbox_xyxy,
+            latitude,
+            longitude
         FROM public.potholes
         ORDER BY time_utc DESC
         LIMIT :limit
@@ -640,7 +653,7 @@ async def topic_router(agent: Agent, query: str, num_documents: int = 5, **kwarg
 db = PostgresDb(db_url=db_url)
 
 # Shared instructions for both agents
-AGENT_INSTRUCTIONS = """
+AGENT_INSTRUCTIONS2 = """
 You are a RAG Agent specialized in answering questions strictly based on a **local knowledge base** stored in a Vector Database.
 There are three available topics, and you must decide which one the user's query belongs to before answering:
 
@@ -658,6 +671,29 @@ Your rules:
 6. Do not add your own information.
 
 When responding via audio, speak clearly and naturally.
+"""
+
+AGENT_INSTRUCTIONS = """
+You are a RAG Agent specialized in answering questions strictly based on a local knowledge base stored in a Vector Database.
+There are three available topics, and you must decide which one the user's query belongs to before answering:
+
+- Accident_reports → For questions about specific car accidents or accident reports (e.g., time, location, details of an incident).
+- Pothole_report → For questions about road conditions, potholes, or street surface issues.
+- Accident_Statistics → For questions about accident numbers, yearly or monthly statistics, or overall accident trends.
+
+Your rules:
+1. Always use information ONLY from the local knowledge base (the vector DB). Never use outside or general knowledge.
+2. Always identify the correct topic and include it at the start of your answer as: "SelectedTopic: <topic_name>".
+3. When the question mentions recency (e.g., “recent,” “latest,” “last,” “most recent accident,” etc.):
+   - Look at the created_at or time_utc fields in the retrieved documents.
+   - Choose the record with the most recent timestamp.
+   - Clearly report the date/time in the answer.
+4. When the question includes “when,” “date,” or “time,” always read the time_utc field from the record.
+5. If multiple recent records exist, summarize the most recent one first and briefly mention others.
+6. If no relevant information is found in the knowledge base, respond:
+   "Sorry, I could not find any matching information in the local knowledge base."
+7. Do not generate or guess information not supported by the data.
+8. When responding via audio, speak clearly and naturally.
 """
 
 # Create TEXT Agent (for text chat)

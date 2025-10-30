@@ -179,5 +179,164 @@
     }
     boot();
   </script>
+  <!--  SHARE button -->
+  <style>
+    .share-fab {
+      position: fixed; right: 18px; bottom: 18px; z-index: 1200;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #f2f2f2; color:#029dfc; border:1px solid rgba(255,255,255,.15);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25); cursor:pointer;
+    }
+    .share-fab i { font-size: 22px; }
+
+    .share-backdrop{
+      position: fixed; inset: 0; background: rgba(0,0,0,.42);
+      display:none; z-index: 1201;
+    }
+    .share-modal{
+      position: fixed; right: 18px; bottom: 86px; z-index: 1202;
+      width: 380px; max-width: calc(100vw - 36px);
+      border-radius: 12px; background: var(--surface, #141414);
+      border:1px solid var(--border, rgba(255,255,255,.12));
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      display:none; overflow:hidden;
+    }
+    .share-head{
+      padding:12px 14px; font-weight:800; border-bottom:1px solid var(--border, rgba(255,255,255,.12));
+    }
+    .share-body{ padding:12px 14px; display:grid; grid-template-columns: 96px 1fr; gap:12px; }
+    .share-thumb{
+      width:96px; height:96px; border-radius:8px; object-fit:cover; background:#222;
+      border:1px solid var(--border, rgba(255,255,255,.12));
+    }
+    .share-meta{ font-size:.92rem; line-height:1.35; }
+    .share-meta .k{ opacity:.7; }
+    .share-actions{
+      padding:12px 14px; display:flex; gap:10px; border-top:1px solid var(--border, rgba(255,255,255,.12));
+    }
+    .btn-share{
+      flex:1; display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+      padding:10px 12px; border-radius:10px; font-weight:700; cursor:pointer; border:0;
+    }
+    .btn-email{ background:#029dfc; color:white; }
+    .btn-wa{ background:#25D366; color:#102a12; }
+    .share-close{
+      position:absolute; top:8px; right:8px; width:34px; height:34px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      background:transparent; color:inherit; border:0; opacity:.7;
+    }
+    .share-close:hover{ opacity:1; }
+    @media (max-width:520px){
+      .share-modal{ left: 18px; right:18px; width:auto; }
+      .share-body{ grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <div class="share-fab" id="shareFab" title="Share">
+    <i class="fa-solid fa-share-nodes"></i>
+  </div>
+  <div class="share-backdrop" id="shareBackdrop"></div>
+  <div class="share-modal" id="shareModal" role="dialog" aria-modal="true" aria-label="Share accident">
+    <div class="share-head">Send incident</div>
+    <button class="share-close" id="shareClose" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    <div class="share-body">
+      <img id="shareThumb" class="share-thumb" alt="thumbnail preview">
+      <div class="share-meta" id="shareMeta"></div>
+    </div>
+    <div class="share-actions">
+      <button class="btn-share btn-email" id="btnEmail"><i class="fa-solid fa-envelope"></i> Email</button>
+      <button class="btn-share btn-wa" id="btnWA"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const fab = document.getElementById('shareFab');
+      const modal = document.getElementById('shareModal');
+      const backdrop = document.getElementById('shareBackdrop');
+      const closeBtn = document.getElementById('shareClose');
+      const shareThumb = document.getElementById('shareThumb');
+      const shareMeta = document.getElementById('shareMeta');
+      const btnEmail = document.getElementById('btnEmail');
+      const btnWA = document.getElementById('btnWA');
+
+      let cached = null; 
+
+      async function getData(){
+        if (cached) return cached;
+        const meta = await j(`${BACKEND}/events/${encodeURIComponent(eventId)}`).catch(()=>({}));
+        const repPayload = await j(`${BACKEND}/events/${encodeURIComponent(eventId)}/report`).catch(()=>({report:{}}));
+        const rep = (repPayload && repPayload.report) || {};
+        cached = { meta, rep };
+        return cached;
+      }
+
+      function buildPreview(meta, rep){
+        const sev = rep.Severity || 'Unknown';
+        const contact = rep.Contact_level || 'Unknown';
+        const tLocal = typeof formatUTCtoLocal === 'function' ? formatUTCtoLocal(meta.time_utc) : (meta.time_utc || '-');
+
+        shareThumb.src = meta.thumbnail_url || '';
+        shareMeta.innerHTML = `
+          <div><span class="k">Event:</span> <b>${eventId}</b></div>
+          <div><span class="k">Camera:</span> ${meta.camera_id || '-'}</div>
+          <div><span class="k">Severity:</span> ${sev}</div>
+          <div><span class="k">Contact:</span> ${contact}</div>
+          <div><span class="k">Time:</span> ${tLocal}</div>
+        `;
+      }
+
+      function buildText(meta, rep){
+        const sev = rep.Severity || 'Unknown';
+        const contact = rep.Contact_level || 'Unknown';
+        const tLocal = typeof formatUTCtoLocal === 'function' ? formatUTCtoLocal(meta.time_utc) : (meta.time_utc || '-');
+        const img = meta.thumbnail_url || '';
+        const loc = (meta.latitude && meta.longitude)
+          ? `Location: ${meta.latitude.toFixed(5)}, ${meta.longitude.toFixed(5)}\nMap: https://www.google.com/maps?q=${meta.latitude},${meta.longitude}`
+            : '';
+
+        const lines = [
+            `New Accident Reported!`,
+            ``,
+            `Event ID: ${eventId}`,
+            `Camera: ${meta.camera_id || '-'}`,
+            `Severity: ${sev}`,
+            `Contact level: ${contact}`,
+            `Time: ${tLocal}`,
+            loc,
+            img ? `Image: ${img}` : ''
+            ].filter(Boolean);
+
+            return lines.join('\n');
+            }
+
+
+      function openModal(){ modal.style.display='block'; backdrop.style.display='block'; }
+      function closeModal(){ modal.style.display='none'; backdrop.style.display='none'; }
+
+      fab.addEventListener('click', async ()=>{
+        const {meta, rep} = await getData();
+        buildPreview(meta, rep);
+        openModal();
+      });
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+
+      btnEmail.addEventListener('click', async ()=>{
+        const {meta, rep} = await getData();
+        const subject = `Accident ${eventId} | ${rep.Severity || 'Unknown'}`;
+        const body = buildText(meta, rep);
+        location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      });
+
+      btnWA.addEventListener('click', async ()=>{
+        const {meta, rep} = await getData();
+        const text = buildText(meta, rep);
+        const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank', 'noopener');
+      });
+    })();
+  </script>
 </body>
 </html>
