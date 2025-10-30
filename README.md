@@ -35,19 +35,21 @@ Buad aims to create an intelligent road-safety platform that:
 
 ---
 
-##  Tech Stack  
+## 🧩 Tech Stack  
 
 | Layer | Technology |
 |-------|-------------|
 | **Backend** | FastAPI |
-| **Frontend** | HTML, CSS, JavaScript |
-| **Models** | YOLOv11 (Accidents & Potholes) |
-| **VLM** | GPT-4.1 Vision via custom wrapper (`vlm_agent_wrapper.py`) |
-| **RAG** | Agno + PostgreSQL + pgVector + OpenAI (Embeddings & Audio) |
+| **Frontend** | HTML/CSS, JavaScript (Web app) |
+| **Computer Vision Modeling** | YOLOv11 (Accidents & Potholes) |
+| **VLM** | Ollama(Accidents Scene analysis) |
+| **RAG** | Agno, PostgreSQL, pgVector (DB), OpenAI (Embbedings, AudioGen) |
 | **Storage** | Supabase Storage (media hosting) |
 | **Python Libraries** | NumPy, Pandas, Matplotlib, OpenCV |
 
 ---
+
+
 
 ##  System Pipeline  
 
@@ -129,20 +131,20 @@ Each confirmed accident image is processed by the Vision-Language Model (GPT-4.1
 }
 ```
 
-> This report is automatically stored in the database and shown in the dashboard’s “Event Details” view.
+> This report is automatically stored in the database and shown in the dashboard’s “Accident/Pothole Details” view.
 
 ---
 
 ## 🧩 Installation
 
-###  Clone the Repository
+### 1️⃣ Clone the Repository
 
 ```bash
 git clone https://github.com/SarahAlshaikhmohamed/Road-Accidents-Detection-System
 cd Road-Accidents-Detection-System
 ```
 
-###  Backend Setup
+###  2️⃣ Backend Setup
 
 ```bash
 python -m venv venv
@@ -152,7 +154,7 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-###  Environment Variables (.env)
+###  3️⃣ Environment Variables (.env)
 
 ```bash
 # Model Paths
@@ -171,7 +173,7 @@ SUPABASE_BUCKET=Capstone
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-###  Run the Backend Server
+###  4️⃣ Run the Backend Server
 
 ```bash
 uvicorn backend.app:app --host 0.0.0.0 --port 8000
@@ -180,7 +182,7 @@ uvicorn backend.app:app --host 0.0.0.0 --port 8000
 Access the web app:
  [http://localhost:8000/home](http://localhost:8000/home)
 
-###  Raspberry Pi Live Detection
+###  5️⃣ Raspberry Pi Live Detection
 
 ```bash
 source venv/bin/activate
@@ -192,7 +194,7 @@ Live Stream:
 
 ---
 
-##  API Endpoints
+## 🌐 API Endpoints
 
 | Method | Endpoint                    | Description                                        |
 | ------ | --------------------------- | -------------------------------------------------- |
@@ -210,38 +212,38 @@ Live Stream:
 
 ---
 
-## Results & Insights
+## 📊 Results & Insights
 
 Our BUAD | بُعد system successfully detects road accidents and potholes in real time using Raspberry Pi cameras integrated with AI models. 
 
--   *Accident Detection*
+-   *🚗 Accident Detection*
   - High detection accuracy on live video streams
   - False alarms reduced using voting logic + VLM validation
   - Events automatically stored in the database with image + location
 
--   *Pothole Detection*
+-   *🕳️ Pothole Detection*
   - Potholes classified into 3 sizes:
     - Small
     - Medium
     - Large
   - Helps in prioritizing road repairs based on severity
 
--   *GPS Integration*
+-   *📍 GPS Integration*
   - Each event is tagged with *latitude and longitude*
 
--   *Dashboard Insights*
+-   *🖥️ Dashboard Insights*
   - Real time monitoring for all detected events
   - Searchable event history with images and metadata
   - Instant access to detailed AI generated reports
 
--   *RAG Chatbot Reporting*
+-   *🤖 RAG Chatbot Reporting*
   - Vector Database stores accidents insights
   - VLM generates a descriptive summary for every accident
   - Chatbot can answer queries related to event & pothole incidents
 
 ---
 
-## Recommendations & Future Work
+## 🔮 Recommendations & Future Work
 
 * Deploy in real urban environments for continuous monitoring.
 * Expand RAG database with more historical data.
@@ -251,7 +253,7 @@ Our BUAD | بُعد system successfully detects road accidents and potholes in r
 
 ---
 
-## Contributors
+## 👩‍💻 Contributors
 
 - Sarah Alshaikhmohamed
 - Lama Almoutiry
@@ -261,7 +263,7 @@ Our BUAD | بُعد system successfully detects road accidents and potholes in r
 
 ---
 
-## Presentation
+## 🎥 Presentation
 
 [Project Demo](https://drive.google.com/drive/folders/1rGE39RDCr-Sov52OHaQ41kee8__eGXeD?usp=drive_link)
 
