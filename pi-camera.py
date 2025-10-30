@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# test.py
-
 import os, io, time, subprocess, signal, threading, json
 from contextlib import contextmanager
 
@@ -10,11 +7,11 @@ from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from ultralytics import YOLO
 import requests
-from collections import deque  # <-- added
+from collections import deque  
 
 # ------------------------------------------------------------
 # Config 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(file))
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 DEFAULT_MODEL_ACC = os.path.join(PROJECT_ROOT, "models", "accident-yolov11n.pt")
 DEFAULT_MODEL_POT = os.path.join(PROJECT_ROOT, "models", "pothole-yolo.pt")
@@ -40,7 +37,6 @@ CAMERA_ID   = os.getenv("CAMERA_ID", "pi_cam01")
 
 # ------------------------------------------------------------
 # Simple drawing helper
-# ------------------------------------------------------------
 def draw_boxes(frame, dets, label):
     color = (0, 255, 0) if label == "Accident" else (255, 0, 0)
     for (x1, y1, x2, y2, conf, _name, _cls) in dets:
@@ -89,10 +85,9 @@ def _post_event(kind: str, camera_id: str, bbox_xyxy, mean_conf, frame, lat=None
         print(f"[POST {kind}] failed: {e}")
 
 # ------------------------------------------------------------
-# Model wrapper
-# ------------------------------------------------------------
+# Model handler
 class PiDetectors:
-    def init(self, imgsz):
+    def __init__(self, imgsz):
         self.imgsz = imgsz
         self.model_acc = None
         self.model_pot = None
@@ -193,7 +188,6 @@ def mjpeg_frames_from_rpicam(width, height, fps):
 
 # ------------------------------------------------------------
 # FastAPI app
-# ------------------------------------------------------------
 app = FastAPI(title="BUAD Pi Camera Detection")
 
 @app.get("/health")
@@ -223,8 +217,8 @@ def stream(
     detect_every_n: int = Query(SKIP_N, ge=1, le=10),
 
     # GPS passthrough
-    lat: float | None = Query(default=None),
-    lon: float | None = Query(default=None),
+    lat: float | None = Query(default=24.853780),
+    lon: float | None = Query(default=46.711963),
 
     # camera id override if needed
     camera_id: str = Query(default=CAMERA_ID),
@@ -237,12 +231,10 @@ def stream(
         def gen():
             det.load()
 
-            # init filtering state INSIDE gen() to avoid UnboundLocalError
             pred_hist_acc = deque(maxlen=VOTE_WIN)
             last_event_time_acc = 0.0
             last_event_roi_acc  = None
 
-            # NEW: pothole voting history
             pred_hist_pot = deque(maxlen=VOTE_WIN)
             last_event_time_pot = 0.0
             last_event_roi_pot  = None
@@ -259,11 +251,11 @@ def stream(
                     try:
                         acc, pot = det.detect(frame, conf_acc=conf_acc, conf_pot=conf_pot)
 
-                        # draw overlays for the stream
+                        # drawing overlays at the stream
                         if acc: vis = draw_boxes(vis, acc, "Accident")
                         if pot: vis = draw_boxes(vis, pot, "Pothole")
 
-                        #  Accident filtering (vote + cooldown + IoU)
+                        #  Accident filtering (vote + cooldown + IoU) 
                         pred_hist_acc.append(1 if acc else 0)
                         if acc and sum(pred_hist_acc) >= VOTE_K:
                             union = union_box([(d[0], d[1], d[2], d[3]) for d in acc])
@@ -279,7 +271,7 @@ def stream(
                                 last_event_time_acc, last_event_roi_acc = now, union
                                 pred_hist_acc.clear()
 
-                        #  Pothole filtering (The same as accident: VOTING + cooldown + IoU) 
+                        # Pothole filtering (the same as accidents :VOTING + cooldown + IoU) 
                         pred_hist_pot.append(1 if pot else 0)
                         if pot and sum(pred_hist_pot) >= VOTE_K:
                             union_p = union_box([(d[0], d[1], d[2], d[3]) for d in pot])
@@ -287,7 +279,6 @@ def stream(
                             same_time_p = (now - last_event_time_pot) < COOLDOWN_S
                             same_roi_p  = (last_event_roi_pot is not None) and iou(last_event_roi_pot, union_p) >= MIN_IOU_SAME
 
-                            # CHANGED: use OR inside the negation
                             if not (same_time_p or same_roi_p):
                                 avg_conf = float(sum(d[4] for d in pot)/len(pot))
                                 main = max(pot, key=lambda d: d[4])
