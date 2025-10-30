@@ -948,3 +948,83 @@ def ui_event_details(request: Request):
 @app.get("/ui/pothole", response_class=HTMLResponse)
 def ui_pothole_details(request: Request):
     return templates.TemplateResponse("pothole_details.html", {"request": request})
+
+@app.post("/ingest/accident")
+async def ingest_accident(
+    image: UploadFile = File(...),
+    camera_id: str = Form(...),
+    mean_conf: float = Form(...),
+    bbox_xyxy: str = Form(...),           # JSON string: [x1,y1,x2,y2]
+    latitude: float | None = Form(None),
+    longitude: float | None = Form(None),
+):
+    """
+    Confirmed ACCIDENT here from the Rasppery Pi camera, decode the image --> reconstruct a single box --> then call process_confirmed_pothole().
+    """
+    try:
+        img_bytes = await image.read()
+        frame = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            return JSONResponse(status_code=400, content={"error": "Invalid image data"})
+
+        bbox = json.loads(bbox_xyxy)
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            return JSONResponse(status_code=400, content={"error": "bbox_xyxy must be [x1,y1,x2,y2]"})
+
+        x1, y1, x2, y2 = map(int, bbox)
+        # detection tuple shape
+        acc_boxes = [(x1, y1, x2, y2, float(mean_conf), "Accident", 0)]
+
+        _submit_bg(
+            process_confirmed_accident,
+            frame,
+            acc_boxes,
+            camera_id,
+            float(mean_conf),
+            latitude,
+            longitude,
+        )
+
+        return {"ok": True, "kind": "accident", "camera_id": camera_id}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.post("/ingest/pothole")
+async def ingest_pothole(
+    image: UploadFile = File(...),
+    camera_id: str = Form(...),
+    mean_conf: float = Form(...),
+    bbox_xyxy: str = Form(...),           # JSON string: [x1,y1,x2,y2]
+    latitude: float | None = Form(...),
+    longitude: float | None = Form(...),
+):
+    """
+    Confirmed POTHOLE here from the Rasppery Pi camera Here we decode the image, reconstruct a single box, then call process_confirmed_pothole().
+    """
+    try:
+        img_bytes = await image.read()
+        frame = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            return JSONResponse(status_code=400, content={"error": "Invalid image data"})
+
+        bbox = json.loads(bbox_xyxy)
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            return JSONResponse(status_code=400, content={"error": "bbox_xyxy must be [x1,y1,x2,y2]"})
+
+        x1, y1, x2, y2 = map(int, bbox)
+        pot_boxes = [(x1, y1, x2, y2, float(mean_conf), "Pothole", 0)]
+
+        _submit_bg(
+            process_confirmed_pothole,
+            frame,
+            pot_boxes,
+            camera_id,
+            float(mean_conf),
+            latitude,
+            longitude,
+        )
+
+        return {"ok": True, "kind": "pothole", "camera_id": camera_id}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
