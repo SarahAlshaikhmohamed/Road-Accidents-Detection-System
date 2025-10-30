@@ -12,10 +12,9 @@
 
   <header class="site-header">
     <nav class="container flex-between">
-      <a href="/" class="brand">Buad</a>
+      <a class="brand" href="#hero">Buad | بُـعـد</a>
       <ul class="nav">
         <li><a href="/home">Home</a></li>
-        <li><a href="/ui/live">Live</a></li>
         <li><a class="active" href="/ui/dashboard">Dashboard</a></li>
         <li><a href="/ui/chat">Chatbot</a></li>
       </ul>
@@ -68,7 +67,7 @@
       </div>
     </details>
 
-    <!-- Confidence (collapsed by default) -->
+    <!-- Confidence -->
     <details class="panel" id="conf-panel">
       <summary>Confidence</summary>
       <div class="panel-body">
@@ -169,7 +168,7 @@
       const evBox = el("ev-list");
       evBox.innerHTML = ev.length ? ("<ul>"+ev.map(x=>`<li>${String(x)}</li>`).join("")+"</ul>") : "No evidence items.";
 
-      // confidence (collapsed if empty)
+      // confidence
       const c = rep.Confidence || {};
       if(Object.keys(c).length){
         Object.entries(c).forEach(([k,v])=> addRow(conf, k, v));
